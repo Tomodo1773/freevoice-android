@@ -6,6 +6,11 @@ import org.junit.Test
 
 class AppSettingsTest {
     private fun valid() = AppSettings(transcriptionApiKey = "key", transcriptionEndpoint = "https://transcribe", formatEndpoint = "https://format", formatApiKey = "format-key")
+    @Test fun `format defaults use terra with low reasoning`() {
+        val settings = AppSettings()
+        assertEquals("gpt-5.6-terra", settings.formatModel)
+        assertEquals("low", settings.reasoningEffort)
+    }
     @Test fun `azure openai requires endpoint and model`() {
         assertEquals("Azure OpenAI のエンドポイントを入力して", valid().copy(transcriptionEndpoint = "").validateForVoiceInput())
         assertEquals("文字起こしモデルを入力して", valid().copy(transcriptionModel = "").validateForVoiceInput())

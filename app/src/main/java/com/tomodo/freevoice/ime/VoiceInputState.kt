@@ -9,3 +9,11 @@ sealed class VoiceInputState {
     data object Formatting : VoiceInputState()
     data class Error(val message: String) : VoiceInputState()
 }
+
+internal enum class MicTapAction { Start, Stop, Ignore }
+
+internal fun VoiceInputState.micTapAction(): MicTapAction = when (this) {
+    VoiceInputState.Idle, is VoiceInputState.Error -> MicTapAction.Start
+    VoiceInputState.Recording -> MicTapAction.Stop
+    VoiceInputState.Starting, VoiceInputState.Transcribing, VoiceInputState.Formatting -> MicTapAction.Ignore
+}

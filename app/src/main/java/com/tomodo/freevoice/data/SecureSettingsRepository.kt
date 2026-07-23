@@ -26,9 +26,9 @@ class SecureSettingsRepository(context: Context) {
         formatProvider = enum(P_FORMAT_PROVIDER, FormatProvider.AZURE),
         formatEndpoint = plain(P_FORMAT_ENDPOINT),
         formatApiKey = secret(P_FORMAT_API_KEY),
-        formatModel = plain(P_FORMAT_MODEL, "gpt-5.2"),
+        formatModel = plain(P_FORMAT_MODEL, AppSettings.DEFAULT_FORMAT_MODEL),
         postprocessPrompt = plain(P_POSTPROCESS_PROMPT, AppSettings.DEFAULT_POSTPROCESS_PROMPT),
-        reasoningEffort = plain(P_REASONING_EFFORT, "low"),
+        reasoningEffort = plain(P_REASONING_EFFORT, AppSettings.DEFAULT_REASONING_EFFORT),
         contextAwareFormatting = preferences.getBoolean(P_CONTEXT_AWARE, true),
     )
 

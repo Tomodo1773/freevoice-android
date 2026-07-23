@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.text.InputType
 import android.view.Gravity
+import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import com.tomodo.freevoice.data.*
@@ -27,8 +28,13 @@ class MainActivity : Activity() {
     private lateinit var transcriptionModel: EditText
     private lateinit var speechEndpoint: EditText
     private lateinit var speechLanguage: EditText
+    private lateinit var transcriptionEndpointRow: View
+    private lateinit var transcriptionModelRow: View
+    private lateinit var speechEndpointRow: View
+    private lateinit var speechLanguageRow: View
     private lateinit var formatEnabled: Switch
     private lateinit var formatEndpoint: EditText
+    private lateinit var formatEndpointRow: View
     private lateinit var formatApiKey: EditText
     private lateinit var formatModel: EditText
     private lateinit var postprocessPrompt: EditText
@@ -66,17 +72,22 @@ class MainActivity : Activity() {
             addView(button("FreeVoice に切り替える", ::showImePicker))
             addView(section("文字起こし"))
             transcriptionProvider = spinner(arrayOf("Azure OpenAI", "Azure Speech")); row("プロバイダー", transcriptionProvider)
-            transcriptionEndpoint = edit("https://resource.services.ai.azure.com/api/projects/project", false); row("OpenAI エンドポイント", transcriptionEndpoint)
+            transcriptionEndpoint = edit("https://resource.services.ai.azure.com/api/projects/project", false)
+            transcriptionEndpointRow = row("Azure OpenAI エンドポイント", transcriptionEndpoint)
             transcriptionApiKey = edit("API キー", true); row("文字起こし API キー", transcriptionApiKey)
-            transcriptionModel = edit("gpt-4o-transcribe", false); row("文字起こしモデル", transcriptionModel)
-            speechEndpoint = edit("https://...", false); row("Speech エンドポイント", speechEndpoint)
-            speechLanguage = edit("ja-JP", false); row("音声言語", speechLanguage)
+            transcriptionModel = edit("gpt-4o-transcribe", false)
+            transcriptionModelRow = row("文字起こしモデル", transcriptionModel)
+            speechEndpoint = edit("https://...", false)
+            speechEndpointRow = row("Speech エンドポイント", speechEndpoint)
+            speechLanguage = edit("ja-JP", false)
+            speechLanguageRow = row("音声言語", speechLanguage)
             addView(section("テキスト整形"))
             formatEnabled = Switch(this@MainActivity).apply { setText(R.string.format_enabled) }; addView(formatEnabled)
             formatProvider = spinner(arrayOf("Azure OpenAI", "OpenAI")); row("整形プロバイダー", formatProvider)
-            formatEndpoint = edit("https://...", false); row("整形エンドポイント（Azure のみ）", formatEndpoint)
+            formatEndpoint = edit("https://...", false)
+            formatEndpointRow = row("整形エンドポイント", formatEndpoint)
             formatApiKey = edit("API キー", true); row("整形 API キー", formatApiKey)
-            formatModel = edit("gpt-5.2", false); row("整形モデル", formatModel)
+            formatModel = edit(AppSettings.DEFAULT_FORMAT_MODEL, false); row("整形モデル", formatModel)
             postprocessPrompt = edit("整形指示", false, 5); row("整形プロンプト", postprocessPrompt)
             reasoningEffort = spinner(REASONING_EFFORTS); row("推論強度", reasoningEffort)
             contextAware = Switch(this@MainActivity).apply { setText(R.string.context_aware_formatting) }; addView(contextAware)
@@ -88,6 +99,8 @@ class MainActivity : Activity() {
             addView(section("診断")); addView(button("診断ログを消去") { diagLogger.clear(); refreshLogs() })
             diagnostics = note(""); addView(diagnostics)
         })
+        transcriptionProvider.onSelectionChanged(::updateFieldVisibility)
+        formatProvider.onSelectionChanged(::updateFieldVisibility)
     }
 
     private fun bind(s: AppSettings) {
@@ -100,6 +113,19 @@ class MainActivity : Activity() {
         postprocessPrompt.setText(s.postprocessPrompt)
         reasoningEffort.setSelection(REASONING_EFFORTS.indexOf(s.reasoningEffort).takeIf { it >= 0 } ?: DEFAULT_REASONING_EFFORT_INDEX)
         contextAware.isChecked = s.contextAwareFormatting
+        updateFieldVisibility()
+    }
+
+    private fun updateFieldVisibility() {
+        val visibility = settingsFieldVisibility(
+            TranscriptionProvider.entries[transcriptionProvider.selectedItemPosition],
+            FormatProvider.entries[formatProvider.selectedItemPosition],
+        )
+        transcriptionEndpointRow.isVisible = visibility.transcriptionEndpoint
+        transcriptionModelRow.isVisible = visibility.transcriptionModel
+        speechEndpointRow.isVisible = visibility.speechEndpoint
+        speechLanguageRow.isVisible = visibility.speechLanguage
+        formatEndpointRow.isVisible = visibility.formatEndpoint
     }
 
     private fun save() {
@@ -148,7 +174,8 @@ class MainActivity : Activity() {
             "${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(entry.timestamp))}  " +
                 "${if (entry.success) "成功" else "失敗"}: ${entry.text.take(160)}${entry.error?.let { " ($it)" }.orEmpty()}"
         }
-        diagnostics.text = diagLogger.read().takeLast(12_000).ifBlank { "診断ログはまだない。" }
+        diagnostics.text = diagLogger.readLatest(DIAGNOSTIC_DISPLAY_LINES)
+            .let { logs -> if (logs.isBlank()) "診断ログはまだない。" else "最新${DIAGNOSTIC_DISPLAY_LINES}件を表示中。古いログは自動で削除される。\n$logs" }
     }
     private fun showImePicker() = (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker()
     private fun title(text: String) = TextView(this).apply { this.text = text; textSize = 26f }
@@ -164,14 +191,25 @@ class MainActivity : Activity() {
             else -> InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
         }
     }
-    private fun LinearLayout.row(label: String, view: android.view.View) = addView(LinearLayout(this@MainActivity).apply {
+    private fun Spinner.onSelectionChanged(action: () -> Unit) {
+        onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) = action()
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+    }
+    private var View.isVisible: Boolean
+        get() = visibility == View.VISIBLE
+        set(value) { visibility = if (value) View.VISIBLE else View.GONE }
+    private fun LinearLayout.row(label: String, view: View): View = LinearLayout(this@MainActivity).apply {
         orientation = LinearLayout.VERTICAL; setPadding(0, dp(4), 0, dp(4)); addView(note(label)); addView(view)
-    })
+        this@row.addView(this)
+    }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     companion object {
         private const val REQUEST_RECORD_AUDIO = 10
         private const val IME_SERVICE = "com.tomodo.freevoice.ime.FreeVoiceInputMethodService"
         private val REASONING_EFFORTS = arrayOf("none", "low", "medium", "high")
-        private const val DEFAULT_REASONING_EFFORT_INDEX = 1
+        private val DEFAULT_REASONING_EFFORT_INDEX = REASONING_EFFORTS.indexOf(AppSettings.DEFAULT_REASONING_EFFORT)
+        private const val DIAGNOSTIC_DISPLAY_LINES = 20
     }
 }

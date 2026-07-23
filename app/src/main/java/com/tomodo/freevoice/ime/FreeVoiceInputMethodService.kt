@@ -62,20 +62,11 @@ class FreeVoiceInputMethodService : InputMethodService() {
         })
     }
 
-    @SuppressLint("ClickableViewAccessibility", "InflateParams") // PTT needs raw UP; IME attaches this root itself.
+    @SuppressLint("InflateParams") // IME attaches this root itself.
     override fun onCreateInputView(): View {
         val view = layoutInflater.inflate(R.layout.ime_freevoice_keyboard, null)
         status = view.findViewById(R.id.ime_status); mic = view.findViewById(R.id.ime_mic)
-        mic.setOnTouchListener { button, event ->
-            when (event.actionMasked) {
-                android.view.MotionEvent.ACTION_DOWN -> startPtt()
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> controller.stop()
-            }
-            // Keep accessibility click semantics although recording intentionally follows press duration.
-            if (event.actionMasked == android.view.MotionEvent.ACTION_UP) button.performClick()
-            true
-        }
-        mic.setOnClickListener { /* accessibility click: recording is touch/PTT-only */ }
+        mic.setOnClickListener { onMicTapped() }
         view.findViewById<Button>(R.id.ime_cancel).setOnClickListener { controller.cancel(); clearTarget() }
         view.findViewById<Button>(R.id.ime_switch).setOnClickListener { getSystemService(InputMethodManager::class.java).showInputMethodPicker() }
         view.findViewById<Button>(R.id.ime_settings).setOnClickListener {
@@ -87,7 +78,15 @@ class FreeVoiceInputMethodService : InputMethodService() {
     override fun onDestroy() { controller.close(); contextExecutor.shutdownNow(); super.onDestroy() }
     override fun onFinishInput() { controller.cancel(); clearTarget(); super.onFinishInput() }
 
-    private fun startPtt() {
+    private fun onMicTapped() {
+        when (controller.currentState().micTapAction()) {
+            MicTapAction.Start -> startRecording()
+            MicTapAction.Stop -> controller.stop()
+            MicTapAction.Ignore -> Unit
+        }
+    }
+
+    private fun startRecording() {
         val permissionError = if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) "マイク権限を許可して" else null
         val appSettings = settings.load()
         val packageName = currentInputEditorInfo?.packageName.orEmpty()
@@ -98,13 +97,20 @@ class FreeVoiceInputMethodService : InputMethodService() {
     private fun render(state: VoiceInputState) {
         if (!::status.isInitialized) return
         status.text = when (state) {
-            VoiceInputState.Idle -> "長押しして話す"
+            VoiceInputState.Idle -> "マイクを押すと録音開始"
             VoiceInputState.Starting -> "録音を準備中…"
-            VoiceInputState.Recording -> "録音中… 指を離すと送信"
+            VoiceInputState.Recording -> "録音中… もう一度押すと送信"
             VoiceInputState.Transcribing -> "文字起こし中…"
             VoiceInputState.Formatting -> "文章を整形中…"
             is VoiceInputState.Error -> state.message
         }
+        mic.setText(
+            when (state) {
+                VoiceInputState.Recording -> R.string.ime_record_stop
+                VoiceInputState.Starting, VoiceInputState.Transcribing, VoiceInputState.Formatting -> R.string.ime_processing
+                else -> R.string.ime_record_start
+            },
+        )
         mic.isEnabled = state is VoiceInputState.Idle || state is VoiceInputState.Error || state is VoiceInputState.Recording
     }
 

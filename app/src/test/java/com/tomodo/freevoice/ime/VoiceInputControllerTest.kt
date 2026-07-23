@@ -59,4 +59,13 @@ class VoiceInputControllerTest {
         controller.cancel(); val newJobId = controller.start("new", null); assertNotNull(newJobId); controller.stop(); release.countDown()
         assertTrue(callbacks.done.await(2, TimeUnit.SECONDS)); assertEquals(listOf(newJobId!! to "new:new"), callbacks.committed); assertFalse(callbacks.committed.any { it.first == oldJobId }); controller.close()
     }
+
+    @Test fun `mic tap starts stops or ignores according to state`() {
+        assertEquals(MicTapAction.Start, VoiceInputState.Idle.micTapAction())
+        assertEquals(MicTapAction.Start, VoiceInputState.Error("retry").micTapAction())
+        assertEquals(MicTapAction.Stop, VoiceInputState.Recording.micTapAction())
+        assertEquals(MicTapAction.Ignore, VoiceInputState.Starting.micTapAction())
+        assertEquals(MicTapAction.Ignore, VoiceInputState.Transcribing.micTapAction())
+        assertEquals(MicTapAction.Ignore, VoiceInputState.Formatting.micTapAction())
+    }
 }
