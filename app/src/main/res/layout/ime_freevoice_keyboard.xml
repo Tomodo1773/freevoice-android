@@ -1,0 +1,12 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"
+    android:padding="12dp" android:background="@drawable/ime_freevoice_background">
+    <TextView android:id="@+id/ime_status" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center" android:text="@string/ime_idle" android:textColor="#FFFFFF" android:padding="6dp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:orientation="horizontal" style="?android:attr/buttonBarStyle">
+        <Button android:id="@+id/ime_switch" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/ime_switch" android:textColor="#FFFFFF" style="?android:attr/buttonBarButtonStyle" />
+        <Button android:id="@+id/ime_cancel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/ime_cancel" android:textColor="#FFFFFF" style="?android:attr/buttonBarButtonStyle" />
+        <Button android:id="@+id/ime_mic" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/ime_record" android:textColor="#FFFFFF" android:textStyle="bold" style="?android:attr/buttonBarButtonStyle" />
+        <Button android:id="@+id/ime_settings" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/ime_settings" android:textColor="#FFFFFF" style="?android:attr/buttonBarButtonStyle" />
+    </LinearLayout>
+</LinearLayout>

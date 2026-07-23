@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">FreeVoice</string>
+    <string name="ime_name">FreeVoice 音声入力</string>
+    <string name="ime_idle">長押しして話す</string>
+    <string name="ime_switch">切替</string>
+    <string name="ime_cancel">取消</string>
+    <string name="ime_record">長押し録音</string>
+    <string name="ime_settings">設定</string>
+    <string name="format_enabled">LLM で整形する</string>
+    <string name="context_aware_formatting">アプリごとの話題コンテキストを使う</string>
+    <string name="setup_status">初期設定: マイク %1$s / FreeVoice キーボード %2$s</string>
+    <string name="status_allowed">許可済み</string>
+    <string name="status_not_allowed">未許可</string>
+    <string name="status_enabled">有効</string>
+    <string name="status_not_enabled">未有効</string>
+</resources>

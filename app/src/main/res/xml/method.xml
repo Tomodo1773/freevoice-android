@@ -1,0 +1,4 @@
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="com.tomodo.freevoice.MainActivity">
+    <subtype android:imeSubtypeLocale="ja_JP" android:imeSubtypeMode="keyboard" />
+</input-method>
