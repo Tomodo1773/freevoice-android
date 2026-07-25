@@ -15,6 +15,7 @@ import android.view.inputmethod.InputMethodManager
 import com.tomodo.freevoice.MainActivity
 import com.tomodo.freevoice.context.TopicContextStore
 import com.tomodo.freevoice.data.SecureSettingsRepository
+import com.tomodo.freevoice.data.TranscriptionProvider
 import com.tomodo.freevoice.diag.DiagLogger
 import com.tomodo.freevoice.databinding.ImeFreevoiceKeyboardBinding
 import com.tomodo.freevoice.history.HistoryRepository
@@ -57,11 +58,22 @@ class FreeVoiceInputMethodService : InputMethodService() {
             connection = { currentInputConnection },
             editorInfo = { currentInputEditorInfo },
         )
+        // 録音時間の上限も認識の中断も、キーを離したのと同じ1本の停止シグナルにする。
+        val gateway = SettingsVoiceGateway(
+            settings = settings,
+            topicContext = topicContext,
+            cacheDir = cacheDir,
+            diagnostics = diagnostics,
+            tracer = tracer,
+            onInterim = { text -> main.post { keyboardUi?.setInterimText(text) } },
+            onStopSignal = { main.post { controller.stop() } },
+        )
         controller = VoiceInputController(
-            recorder = AndroidVoiceRecorder(cacheDir) { main.post { controller.stop() } },
-            gateway = SettingsVoiceGateway(settings, topicContext, tracer),
+            sessionFactory = gateway::createSession,
+            formatter = gateway,
             callbacks = voiceCallbacks(),
         )
+        warmUpSpeechSdkIfSelected()
     }
 
     override fun onCreateInputView(): View {
@@ -175,6 +187,18 @@ class FreeVoiceInputMethodService : InputMethodService() {
     private fun cancelVoiceInput() {
         controller.cancel()
         clearTarget()
+    }
+
+    /**
+     * Speech SDK は初回利用時にネイティブライブラリを読み込む。録音開始のタップで
+     * それを待たせないよう、使う設定のときだけ先に済ませておく。
+     */
+    private fun warmUpSpeechSdkIfSelected() {
+        if (settings.load().transcriptionProvider != TranscriptionProvider.AZURE_SPEECH) return
+        Thread({
+            runCatching { Class.forName("com.microsoft.cognitiveservices.speech.SpeechConfig") }
+                .onFailure { diagnostics.warn("speech", "SDK warm-up failed", it) }
+        }, "FreeVoiceSpeechWarmup").start()
     }
 
     private fun showKeyboardPicker() {

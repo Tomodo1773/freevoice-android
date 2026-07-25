@@ -27,6 +27,12 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+
+        // Speech SDK はネイティブライブラリを ABI ごとに同梱する。実機とエミュレータの
+        // ぶんだけ残し、APK が不要に膨らまないようにする。
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     if (localSigningPropertiesFile.isFile) {
@@ -79,6 +85,9 @@ kotlin {
 }
 
 dependencies {
+    // Azure Speech の連続認識（WebSocket）。REST と違い発話中に認識が進む。
+    implementation("com.microsoft.cognitiveservices.speech:client-sdk:1.50.0")
+
     testImplementation("junit:junit:4.13.2")
     // android.jar の org.json はスタブなので、JVM テストでは実装を差す。
     testImplementation("org.json:json:20250107")

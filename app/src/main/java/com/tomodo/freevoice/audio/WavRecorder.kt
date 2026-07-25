@@ -16,7 +16,9 @@ class WavRecorder(
 ) {
     companion object {
         const val SAMPLE_RATE = 16_000
-        private const val MAX_DURATION_MS = 120_000L
+
+        /** 録音の上限。ストリーミング認識も同じ上限で自動停止させる。 */
+        internal const val MAX_DURATION_MS = 120_000L
     }
 
     private var recorder: AudioRecord? = null

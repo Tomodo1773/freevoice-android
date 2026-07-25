@@ -29,9 +29,6 @@ object AzureEndpoints {
 
     fun openAiChat(): String = "https://api.openai.com/v1/chat/completions"
 
-    fun speech(baseUrl: String, language: String): String =
-        "${baseUrl.trim().trimEnd('/')}/speech/recognition/conversation/cognitiveservices/v1?language=${language.queryEncode()}&format=detailed"
-
     private fun String.pathEncode() = URLEncoder.encode(this, "UTF-8").replace("+", "%20")
     private fun String.queryEncode() = URLEncoder.encode(this, "UTF-8")
 }

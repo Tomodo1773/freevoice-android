@@ -1,30 +1,42 @@
 package com.tomodo.freevoice.ime
 
-import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+
+/** Message shown to the user as-is.  VoiceSession implementations throw it too. */
+internal class UserVisibleException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
  * Owns the one voice-input job.  The small interfaces deliberately keep its
  * cancellation and state rules unit-testable without Android framework types.
  */
 class VoiceInputController(
-    private val recorder: Recorder,
-    private val gateway: Gateway,
+    private val sessionFactory: () -> VoiceSession,
+    private val formatter: Formatter,
     private val callbacks: Callbacks,
     private val executor: ExecutorService = Executors.newSingleThreadExecutor(),
     private val elapsedRealtimeMillis: () -> Long = { System.nanoTime() / 1_000_000L },
 ) {
     data class FormattedText(val text: String, val fallback: Boolean)
 
-    interface Recorder {
+    /**
+     * Owns one recording from start to finish.  Capture and transcription are not
+     * split because streaming recognition makes them inseparable: the SDK holds the
+     * microphone and text arrives while the user is still speaking.  Every exit path
+     * releases the session's own resources.
+     */
+    interface VoiceSession {
+        /** Returns immediately.  Only capture/construction failures throw. */
         fun start()
-        fun stop(): File?
+
+        /** Ends recognition and returns the final text.  Blocking. */
+        fun finish(): String
+
+        /** Non-blocking.  Later callbacks are ignored. */
         fun cancel()
     }
 
-    interface Gateway {
-        fun transcribe(wav: File): String
+    interface Formatter {
         fun format(text: String, packageName: String): FormattedText
         fun cancel()
     }
@@ -37,6 +49,7 @@ class VoiceInputController(
 
     private val lock = Any()
     private var state: VoiceInputState = VoiceInputState.Idle
+    private var session: VoiceSession? = null
     private var packageName = ""
     private var cancelled = false
     private var closed = false
@@ -57,39 +70,36 @@ class VoiceInputController(
         transitionLocked(VoiceInputState.Starting)
 
         try {
-            recorder.start()
+            val started = sessionFactory()
+            session = started
+            started.start()
             transitionLocked(VoiceInputState.Recording(elapsedRealtimeMillis()))
             generation
         } catch (error: Exception) {
+            session = null
             failLocked("録音を開始できなかった", error)
             null
         }
     }
 
+    /**
+     * The single stop signal.  A released key, the recording time limit and a
+     * recognition breakdown all arrive here, so the job has one way to end.
+     */
     fun stop() = synchronized(lock) {
         if (state !is VoiceInputState.Recording || closed) return
-
-        val wav = try {
-            recorder.stop()
-        } catch (error: Exception) {
-            failLocked("録音を終了できなかった", error)
-            return
-        }
-        if (wav == null || wav.length() <= 44L) {
-            failUserLocked("音声が録音されていない")
-            return
-        }
+        val active = session ?: return
 
         transitionLocked(VoiceInputState.Transcribing)
         val jobPackage = packageName
         val jobGeneration = generation
         executor.execute {
             try {
-                val raw = gateway.transcribe(wav).trim()
+                val raw = active.finish().trim()
                 if (raw.isBlank()) throw UserVisibleException("音声を認識できなかった")
                 if (!isActive(jobGeneration)) return@execute
                 transition(jobGeneration, VoiceInputState.Formatting)
-                val formatted = gateway.format(raw, jobPackage)
+                val formatted = formatter.format(raw, jobPackage)
                 val text = formatted.text.trim().ifBlank { raw }
                 if (isActive(jobGeneration)) {
                     callbacks.committed(jobGeneration, text, jobPackage, formatted.fallback)
@@ -99,8 +109,6 @@ class VoiceInputController(
                 if (isActive(jobGeneration)) {
                     fail(jobGeneration, classify(error), error)
                 }
-            } finally {
-                wav.delete()
             }
         }
     }
@@ -153,8 +161,9 @@ class VoiceInputController(
     private fun cancelLocked() {
         cancelled = true
         generation++
-        recorder.cancel()
-        gateway.cancel()
+        session?.cancel()
+        session = null
+        formatter.cancel()
         transitionLocked(VoiceInputState.Idle)
     }
 
@@ -165,6 +174,4 @@ class VoiceInputController(
         error.message?.contains("Cancelled", true) == true -> "キャンセルした"
         else -> (error as? UserVisibleException)?.message ?: "通信または文字起こしに失敗した"
     }
-
-    private class UserVisibleException(message: String) : Exception(message)
 }

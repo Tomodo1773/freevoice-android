@@ -27,6 +27,12 @@ internal class ImeKeyboardUi(
 
     private val handler = Handler(Looper.getMainLooper())
     private var state: ImeKeyboardUiState? = null
+
+    /**
+     * 認識中のテキスト。制御状態ではなく表示だけの持ち物なので VoiceInputState には
+     * 載せず、ここで抱える（ADR 0001: 表示の状態はまず表示側で表現する）。
+     */
+    private var interimText = ""
     private val recordingTick = object : Runnable {
         override fun run() {
             renderStatus()
@@ -47,11 +53,19 @@ internal class ImeKeyboardUi(
 
     fun render(next: ImeKeyboardUiState) {
         state = next
+        if (next.statusKind != ImeStatusKind.RECORDING) interimText = ""
         handler.removeCallbacks(recordingTick)
         renderStatus()
         renderPrimaryAction(next)
         binding.imeCancel.visibility = if (next.cancelVisible) View.VISIBLE else View.GONE
         if (next.recordingStartedAtMillis != null) handler.postDelayed(recordingTick, 1_000L)
+    }
+
+    /** Streaming recognition only; the batch provider never reports partial text. */
+    fun setInterimText(text: String) {
+        if (state?.statusKind != ImeStatusKind.RECORDING) return
+        interimText = text
+        renderStatus()
     }
 
     fun setEnterCommand(command: ImeEnterCommand) {
@@ -61,6 +75,7 @@ internal class ImeKeyboardUi(
     fun close() {
         handler.removeCallbacks(recordingTick)
         state = null
+        interimText = ""
     }
 
     private fun renderStatus() {
@@ -72,7 +87,9 @@ internal class ImeKeyboardUi(
                 val elapsed = (
                     elapsedRealtimeMillis() - requireNotNull(current.recordingStartedAtMillis)
                 ).coerceAtLeast(0L)
-                text(R.string.ime_recording_time, formatRecordingElapsed(elapsed))
+                val time = text(R.string.ime_recording_time, formatRecordingElapsed(elapsed))
+                val tail = interimTail(interimText)
+                if (tail.isEmpty()) time else "$time $tail"
             }
             ImeStatusKind.TRANSCRIBING -> text(R.string.ime_transcribing)
             ImeStatusKind.FORMATTING -> text(R.string.ime_formatting)
@@ -183,3 +200,12 @@ internal fun formatRecordingElapsed(elapsedMillis: Long): String {
     val totalSeconds = elapsedMillis.coerceAtLeast(0L) / 1_000L
     return String.format(Locale.ROOT, "%02d:%02d", totalSeconds / 60L, totalSeconds % 60L)
 }
+
+/** ステータス行は1行しかないので、認識中のテキストは末尾だけを見せる。 */
+internal fun interimTail(text: String, maxChars: Int = INTERIM_TAIL_CHARS): String {
+    val trimmed = text.trim()
+    if (trimmed.length <= maxChars) return trimmed
+    return "…" + trimmed.takeLast(maxChars)
+}
+
+private const val INTERIM_TAIL_CHARS = 18

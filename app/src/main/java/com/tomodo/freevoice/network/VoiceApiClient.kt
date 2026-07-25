@@ -15,14 +15,13 @@ data class FormatResult(val text: String, val fallback: Boolean, val fallbackRea
 data class VoiceApiConfig(
     val azureOpenAiBaseUrl: String = "", val azureOpenAiKey: String = "", val transcriptionDeployment: String = "",
     val chatDeployment: String = "", val chatBaseUrl: String = "", val chatApiKey: String = "",
-    val speechEndpoint: String = "", val speechKey: String = "", val speechLanguage: String = "ja-JP",
     val chatProvider: ChatProvider = ChatProvider.AZURE, val reasoningEffort: String = ""
 )
 
+// Azure Speech はここを通らない。Speech SDK が設定から直接ストリーミング接続する。
 fun AppSettings.toVoiceApiConfig() = VoiceApiConfig(
     azureOpenAiBaseUrl = transcriptionEndpoint, azureOpenAiKey = transcriptionApiKey, transcriptionDeployment = transcriptionModel,
     chatDeployment = formatModel, chatBaseUrl = formatEndpoint, chatApiKey = formatApiKey,
-    speechEndpoint = speechEndpoint, speechKey = transcriptionApiKey, speechLanguage = speechLanguage,
     chatProvider = if (formatProvider == FormatProvider.AZURE) ChatProvider.AZURE else ChatProvider.OPENAI,
     reasoningEffort = reasoningEffort
 )
@@ -51,14 +50,6 @@ class VoiceApiClient(private val config: VoiceApiConfig, private val onTrace: ((
                     wav.inputStream().use { it.copyTo(data) }; data.writeBytes("\r\n--$boundary--\r\n")
                 }
             }.let { JSONObject(it).optString("text").trim().also { text -> if (text.isBlank()) throw VoiceApiException("Empty transcription response") } }
-        }
-    }
-
-    fun transcribeAzureSpeech(wav: File): String {
-        require(config.speechKey.isNotBlank() && config.speechEndpoint.isNotBlank()) { "Azure Speech settings are missing" }
-        return withRetry {
-            request(AzureEndpoints.speech(config.speechEndpoint, config.speechLanguage), mapOf("Ocp-Apim-Subscription-Key" to config.speechKey, "Content-Type" to "audio/wav; codecs=audio/pcm; samplerate=16000")) { out -> wav.inputStream().use { it.copyTo(out) } }
-                .let { JSONObject(it).optString("DisplayText").trim().also { text -> if (text.isBlank()) throw VoiceApiException("Empty transcription response") } }
         }
     }
 
