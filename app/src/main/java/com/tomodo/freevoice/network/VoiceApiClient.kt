@@ -27,11 +27,14 @@ fun AppSettings.toVoiceApiConfig() = VoiceApiConfig(
     reasoningEffort = reasoningEffort
 )
 
-open class VoiceApiException(message: String, cause: Throwable? = null) : Exception(message, cause)
+open class VoiceApiException(message: String, cause: Throwable? = null, val status: Int? = null) : Exception(message, cause)
 class VoiceApiCancelledException : VoiceApiException("Cancelled")
 
-/** Blocking client; invoke only on a worker thread. */
-class VoiceApiClient(private val config: VoiceApiConfig) {
+/**
+ * Blocking client; invoke only on a worker thread.
+ * onTrace は null なら計測ごと省く。送信先の詳細はここでは持たない。
+ */
+class VoiceApiClient(private val config: VoiceApiConfig, private val onTrace: ((LlmSpan) -> Unit)? = null) {
     private val cancelled = AtomicBoolean(false)
     @Volatile private var activeConnection: HttpURLConnection? = null
     fun cancel() { cancelled.set(true); activeConnection?.disconnect() }
@@ -59,29 +62,80 @@ class VoiceApiClient(private val config: VoiceApiConfig) {
         }
     }
 
-    fun format(original: String, prompt: String, context: String? = null): FormatResult = runFormat(original, prompt, context)
-    fun distill(previous: String, formatted: String): FormatResult = runFormat("<これまでの話題>\n$previous\n</これまでの話題>\n<新しい発話>\n$formatted\n</新しい発話>", com.tomodo.freevoice.context.TopicContextStore.DISTILL_SYSTEM_PROMPT)
+    fun format(original: String, prompt: String, context: String? = null): FormatResult = runFormat("format", original, prompt, context)
+    fun distill(previous: String, formatted: String): FormatResult = runFormat("distill", "<これまでの話題>\n$previous\n</これまでの話題>\n<新しい発話>\n$formatted\n</新しい発話>", com.tomodo.freevoice.context.TopicContextStore.DISTILL_SYSTEM_PROMPT)
 
-    private fun runFormat(original: String, prompt: String, context: String? = null): FormatResult {
+    private fun runFormat(spanName: String, original: String, prompt: String, context: String? = null): FormatResult {
         if (original.isBlank()) return FormatResult(original, true, "empty original")
+        val source = buildString { if (!context.isNullOrBlank()) append("<参考トピック>\n").append(context).append("\n</参考トピック>\n"); append("<校正対象>\n").append(original).append("\n</校正対象>") }
+        val messages = listOf(ChatMessage("system", prompt), ChatMessage("user", source))
+        val startMs = System.currentTimeMillis()
         try {
-            val source = buildString { if (!context.isNullOrBlank()) append("<参考トピック>\n").append(context).append("\n</参考トピック>\n"); append("<校正対象>\n").append(original).append("\n</校正対象>") }
-            val messages = JSONArray().put(JSONObject().put("role", "system").put("content", prompt)).put(JSONObject().put("role", "user").put("content", source))
-            val payload = JSONObject().put("model", config.chatDeployment).put("messages", messages)
+            val payload = JSONObject().put("model", config.chatDeployment).put("messages", messages.toJson())
             if (config.reasoningEffort.isNotBlank()) payload.put("reasoning_effort", config.reasoningEffort)
-            val text = withRetry {
+            // 完成した 1 応答だけを返す。試行をまたぐ可変状態を作らないので、
+            // リトライしても前の試行のモデル名やトークン数が混ざらない。
+            val completion = withRetry {
                 val (url, headers) = if (config.chatProvider == ChatProvider.AZURE) AzureEndpoints.azureChat(config.chatBaseUrl) to mapOf("api-key" to config.chatApiKey)
                 else AzureEndpoints.openAiChat() to mapOf("Authorization" to "Bearer ${config.chatApiKey}")
-                request(url, headers + mapOf("Content-Type" to "application/json")) { it.write(payload.toString().toByteArray()) }
-                    .let { JSONObject(it).optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content")?.trim().orEmpty() }
-                    .also { if (it.isBlank()) throw RetryableException("Empty format response") }
+                JSONObject(request(url, headers + mapOf("Content-Type" to "application/json")) { it.write(payload.toString().toByteArray()) })
+                    .toChatCompletion()
+                    .also { if (it.text.isBlank()) throw RetryableException("Empty format response") }
             }
-            return if (text.isBlank()) FormatResult(original, true, "empty format response") else FormatResult(text, false)
+            trace(spanName, messages, startMs, completion)
+            return FormatResult(completion.text, false)
         } catch (e: VoiceApiCancelledException) { throw e
-        } catch (e: Exception) { return FormatResult(original, true, e.message ?: e.javaClass.simpleName) }
+        } catch (e: Exception) {
+            val reason = e.message ?: e.javaClass.simpleName
+            trace(spanName, messages, startMs, error = reason, errorStatus = statusOf(e))
+            return FormatResult(original, true, reason)
+        }
     }
 
-    private fun withRetry(block: () -> String): String {
+    private data class ChatCompletion(val text: String, val model: String?, val inputTokens: Int?, val outputTokens: Int?)
+
+    private fun List<ChatMessage>.toJson(): JSONArray =
+        fold(JSONArray()) { array, message -> array.put(JSONObject().put("role", message.role).put("content", message.content)) }
+
+    private fun JSONObject.toChatCompletion(): ChatCompletion = ChatCompletion(
+        text = optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content")?.trim().orEmpty(),
+        model = optString("model").takeIf { it.isNotBlank() },
+        inputTokens = optJSONObject("usage")?.optInt("prompt_tokens", -1)?.takeIf { it >= 0 },
+        outputTokens = optJSONObject("usage")?.optInt("completion_tokens", -1)?.takeIf { it >= 0 },
+    )
+
+    /** キャンセル時は呼ばない。応答が無い失敗では completion ごと null になる。 */
+    private fun trace(
+        spanName: String, messages: List<ChatMessage>, startMs: Long, completion: ChatCompletion? = null,
+        error: String? = null, errorStatus: Int? = null,
+    ) {
+        val sink = onTrace ?: return
+        sink(
+            LlmSpan(
+                spanName = spanName,
+                provider = config.chatProvider,
+                requestModel = config.chatDeployment,
+                responseModel = completion?.model,
+                messages = messages,
+                completion = completion?.text,
+                reasoningEffort = config.reasoningEffort,
+                inputTokens = completion?.inputTokens,
+                outputTokens = completion?.outputTokens,
+                startTimeMs = startMs,
+                endTimeMs = System.currentTimeMillis(),
+                errorMessage = error,
+                errorStatus = errorStatus,
+            ),
+        )
+    }
+
+    private fun statusOf(error: Throwable): Int? = when (error) {
+        is VoiceApiException -> error.status
+        is RetryableException -> error.status
+        else -> null
+    }
+
+    private fun <T> withRetry(block: () -> T): T {
         var last: RetryableException? = null
         for (delay in longArrayOf(0, 1_000, 3_000)) {
             checkCancelled(); sleepCancellable(delay)
@@ -99,8 +153,8 @@ class VoiceApiClient(private val config: VoiceApiConfig) {
             val code = connection.responseCode
             val text = (if (code in 200..299) connection.inputStream else connection.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (code !in 200..299) {
-                if (code in setOf(429, 500, 502, 503)) throw RetryableException("HTTP $code")
-                throw VoiceApiException("HTTP $code")
+                if (code in setOf(429, 500, 502, 503)) throw RetryableException("HTTP $code", code)
+                throw VoiceApiException("HTTP $code", status = code)
             }
             return text
         } catch (e: java.io.IOException) { if (cancelled.get()) throw VoiceApiCancelledException(); throw e
@@ -119,5 +173,5 @@ class VoiceApiClient(private val config: VoiceApiConfig) {
             remaining -= chunk
         }
     }
-    private class RetryableException(message: String) : Exception(message)
+    private class RetryableException(message: String, val status: Int? = null) : Exception(message)
 }

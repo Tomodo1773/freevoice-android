@@ -5,7 +5,9 @@ import com.tomodo.freevoice.context.TopicContextStore
 import com.tomodo.freevoice.data.AppSettings
 import com.tomodo.freevoice.data.SecureSettingsRepository
 import com.tomodo.freevoice.data.TranscriptionProvider
+import com.tomodo.freevoice.network.LangsmithTracer
 import com.tomodo.freevoice.network.VoiceApiClient
+import com.tomodo.freevoice.network.sinkFor
 import com.tomodo.freevoice.network.toVoiceApiConfig
 import java.io.File
 
@@ -23,6 +25,7 @@ internal class AndroidVoiceRecorder(
 internal class SettingsVoiceGateway(
     private val settings: SecureSettingsRepository,
     private val topicContext: TopicContextStore,
+    private val tracer: LangsmithTracer? = null,
 ) : VoiceInputController.Gateway {
     @Volatile private var client: VoiceApiClient? = null
     private var activeSettings: AppSettings? = null
@@ -30,7 +33,7 @@ internal class SettingsVoiceGateway(
     override fun transcribe(wav: File): String {
         val current = settings.load()
         activeSettings = current
-        val activeClient = VoiceApiClient(current.toVoiceApiConfig())
+        val activeClient = VoiceApiClient(current.toVoiceApiConfig(), tracer.sinkFor(current))
         client = activeClient
         return when (current.transcriptionProvider) {
             TranscriptionProvider.AZURE_OPENAI -> activeClient.transcribeAzureOpenAi(wav)

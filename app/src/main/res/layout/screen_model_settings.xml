@@ -291,6 +291,99 @@
             </LinearLayout>
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/fv_card_background"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                style="@style/Widget.FreeVoice.SectionTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/langsmith_title" />
+
+            <TextView
+                style="@style/Widget.FreeVoice.Note"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/langsmith_note" />
+
+            <Switch
+                android:id="@+id/model_langsmith_enabled"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minHeight="48dp"
+                android:text="@string/langsmith_enabled" />
+
+            <LinearLayout
+                android:id="@+id/model_langsmith_fields"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/Widget.FreeVoice.FieldLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:labelFor="@id/model_langsmith_api_key"
+                    android:text="@string/langsmith_api_key" />
+
+                <EditText
+                    android:id="@+id/model_langsmith_api_key"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:importantForAutofill="no"
+                    android:inputType="textPassword"
+                    android:maxLines="1"
+                    android:saveEnabled="false" />
+
+                <TextView
+                    style="@style/Widget.FreeVoice.FieldLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:labelFor="@id/model_langsmith_project"
+                    android:text="@string/langsmith_project" />
+
+                <EditText
+                    android:id="@+id/model_langsmith_project"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:importantForAutofill="no"
+                    android:inputType="text"
+                    android:maxLines="1" />
+
+                <TextView
+                    style="@style/Widget.FreeVoice.FieldLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:labelFor="@id/model_langsmith_region"
+                    android:text="@string/langsmith_region" />
+
+                <Spinner
+                    android:id="@+id/model_langsmith_region"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp" />
+
+                <Switch
+                    android:id="@+id/model_langsmith_include_content"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:minHeight="48dp"
+                    android:text="@string/langsmith_include_content" />
+
+                <TextView
+                    style="@style/Widget.FreeVoice.Note"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/langsmith_content_note" />
+            </LinearLayout>
+        </LinearLayout>
+
         <TextView
             android:id="@+id/model_save_status"
             style="@style/Widget.FreeVoice.Note"

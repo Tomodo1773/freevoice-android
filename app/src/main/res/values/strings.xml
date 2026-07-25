@@ -48,6 +48,14 @@
     <string name="speech_language">音声言語</string>
     <string name="format_model">文章整形モデル</string>
     <string name="reasoning_effort">Reasoning Effort</string>
+    <string name="langsmith_title">LangSmith トレーシング（任意）</string>
+    <string name="langsmith_enabled">LangSmith にトレースを送る</string>
+    <string name="langsmith_api_key">LangSmith API キー</string>
+    <string name="langsmith_project">LangSmith プロジェクト</string>
+    <string name="langsmith_region">リージョン</string>
+    <string name="langsmith_include_content">プロンプトと本文もトレースに含める</string>
+    <string name="langsmith_note">整形と話題コンテキスト生成の LLM 呼び出しを送信する。送信失敗は音声入力に影響しない。</string>
+    <string name="langsmith_content_note">オフにすると、モデル名・トークン数・所要時間だけを送る。</string>
     <string name="azure_openai_endpoint_example">例: https://resource.services.ai.azure.com/api/projects/project</string>
     <string name="speech_endpoint_example">例: https://eastus2.stt.speech.microsoft.com</string>
     <string name="format_endpoint_example">例: https://your-resource.openai.azure.com/</string>

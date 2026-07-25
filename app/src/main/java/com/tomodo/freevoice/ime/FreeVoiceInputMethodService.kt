@@ -16,6 +16,7 @@ import com.tomodo.freevoice.data.SecureSettingsRepository
 import com.tomodo.freevoice.diag.DiagLogger
 import com.tomodo.freevoice.databinding.ImeFreevoiceKeyboardBinding
 import com.tomodo.freevoice.history.HistoryRepository
+import com.tomodo.freevoice.network.LangsmithTracer
 
 /**
  * Android lifecycle and composition root for the IME.
@@ -37,6 +38,7 @@ class FreeVoiceInputMethodService : InputMethodService() {
     private lateinit var history: HistoryRepository
     private lateinit var diagnostics: DiagLogger
     private lateinit var contextUpdater: TopicContextUpdater
+    private lateinit var tracer: LangsmithTracer
     private lateinit var editor: ImeEditor
     private var keyboardUi: ImeKeyboardUi? = null
     @Volatile private var target: Target? = null
@@ -47,14 +49,15 @@ class FreeVoiceInputMethodService : InputMethodService() {
         topicContext = TopicContextStore()
         history = HistoryRepository(this)
         diagnostics = DiagLogger(this)
-        contextUpdater = TopicContextUpdater(settings, topicContext, diagnostics)
+        tracer = LangsmithTracer(onFailure = { message -> diagnostics.warn("langsmith", message) })
+        contextUpdater = TopicContextUpdater(settings, topicContext, diagnostics, tracer)
         editor = ImeEditor(
             connection = { currentInputConnection },
             editorInfo = { currentInputEditorInfo },
         )
         controller = VoiceInputController(
             recorder = AndroidVoiceRecorder(cacheDir) { main.post { controller.stop() } },
-            gateway = SettingsVoiceGateway(settings, topicContext),
+            gateway = SettingsVoiceGateway(settings, topicContext, tracer),
             callbacks = voiceCallbacks(),
         )
     }
@@ -97,6 +100,7 @@ class FreeVoiceInputMethodService : InputMethodService() {
         keyboardUi = null
         controller.close()
         contextUpdater.close()
+        tracer.close()
         super.onDestroy()
     }
 

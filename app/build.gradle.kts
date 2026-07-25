@@ -80,4 +80,6 @@ kotlin {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    // android.jar の org.json はスタブなので、JVM テストでは実装を差す。
+    testImplementation("org.json:json:20250107")
 }

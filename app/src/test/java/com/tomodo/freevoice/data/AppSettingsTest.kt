@@ -1,5 +1,6 @@
 package com.tomodo.freevoice.data
 
+import com.tomodo.freevoice.network.toLangsmithConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -19,6 +20,22 @@ class AppSettingsTest {
         val speech = valid().copy(transcriptionProvider = TranscriptionProvider.AZURE_SPEECH)
         assertEquals("Azure Speech のエンドポイントを入力して", speech.copy(speechEndpoint = "").validateForVoiceInput())
         assertEquals("音声言語を入力して", speech.copy(speechEndpoint = "https://speech", speechLanguage = "").validateForVoiceInput())
+    }
+    @Test fun `langsmith is opt-in and never blocks voice input`() {
+        assertEquals(false, AppSettings().langsmithEnabled)
+        assertEquals(false, AppSettings().toLangsmithConfig().active)
+        assertNull(valid().copy(langsmithEnabled = true, langsmithApiKey = "").validateForVoiceInput())
+    }
+    @Test fun `langsmith config mirrors the saved settings`() {
+        val config = valid().copy(
+            langsmithEnabled = true, langsmithApiKey = "ls-key", langsmithProject = "freevoice-android",
+            langsmithRegion = LangsmithRegion.EU, langsmithIncludeContent = false,
+        ).toLangsmithConfig()
+        assertEquals(true, config.active)
+        assertEquals("ls-key", config.apiKey)
+        assertEquals("freevoice-android", config.project)
+        assertEquals(LangsmithRegion.EU, config.region)
+        assertEquals(false, config.includeContent)
     }
     @Test fun `format validation respects enabled and provider`() {
         assertNull(valid().copy(formatEnabled = false).validateForVoiceInput())

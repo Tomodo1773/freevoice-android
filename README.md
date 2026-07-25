@@ -28,6 +28,14 @@ sfw .\gradlew.bat assembleRelease
 
 開発用の debug APK は `app/build/outputs/apk/debug/app-debug.apk`。配布・更新確認には使わない。
 
+### LangSmith トレーシング（任意）
+
+「モデル」タブの LangSmith セクションで API キー・プロジェクト・リージョン（US/EU）を設定すると、文章整形と話題コンテキスト生成の LLM 呼び出しを LangSmith へ送信できる。後処理プロンプトの改善やデバッグに使う。既定はオフ。
+
+- 送信は録音・整形とは別スレッドで行い、失敗しても音声入力には影響しない（診断ログに WARN を残すだけ）。
+- 「プロンプトと本文もトレースに含める」をオフにすると、モデル名・トークン数・所要時間だけを送る。発話内容を外部に出したくない場合に使う。
+- LangSmith API キーも他の API キーと同じく Android Keystore で暗号化して保存する。
+
 API キーは Android Keystore の AES/GCM 鍵で暗号化して SharedPreferences に保存する。端末の root 化や侵害に対する完全な防御ではないため、個人端末でのみ使うこと。
 
 ## 配布用 APK の署名

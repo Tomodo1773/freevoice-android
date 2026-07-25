@@ -3,7 +3,9 @@ package com.tomodo.freevoice.ime
 import com.tomodo.freevoice.context.TopicContextStore
 import com.tomodo.freevoice.data.SecureSettingsRepository
 import com.tomodo.freevoice.diag.DiagLogger
+import com.tomodo.freevoice.network.LangsmithTracer
 import com.tomodo.freevoice.network.VoiceApiClient
+import com.tomodo.freevoice.network.sinkFor
 import com.tomodo.freevoice.network.toVoiceApiConfig
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -13,6 +15,7 @@ internal class TopicContextUpdater(
     private val settings: SecureSettingsRepository,
     private val topicContext: TopicContextStore,
     private val diagnostics: DiagLogger,
+    private val tracer: LangsmithTracer? = null,
     private val executor: ExecutorService = Executors.newSingleThreadExecutor(),
 ) : AutoCloseable {
     @Volatile private var activeClient: VoiceApiClient? = null
@@ -30,7 +33,8 @@ internal class TopicContextUpdater(
 
         executor.execute {
             try {
-                val client = VoiceApiClient(settings.load().toVoiceApiConfig())
+                val latest = settings.load()
+                val client = VoiceApiClient(latest.toVoiceApiConfig(), tracer.sinkFor(latest))
                 activeClient = client
                 val result = client.distill(topicContext.get(packageName).orEmpty(), text)
                 if (result.fallback) {

@@ -30,6 +30,11 @@ class SecureSettingsRepository(context: Context) {
         postprocessPrompt = plain(P_POSTPROCESS_PROMPT, AppSettings.DEFAULT_POSTPROCESS_PROMPT),
         reasoningEffort = plain(P_REASONING_EFFORT, AppSettings.DEFAULT_REASONING_EFFORT),
         contextAwareFormatting = preferences.getBoolean(P_CONTEXT_AWARE, true),
+        langsmithEnabled = preferences.getBoolean(P_LANGSMITH_ENABLED, false),
+        langsmithApiKey = secret(P_LANGSMITH_API_KEY),
+        langsmithProject = plain(P_LANGSMITH_PROJECT, AppSettings.DEFAULT_LANGSMITH_PROJECT),
+        langsmithRegion = enum(P_LANGSMITH_REGION, LangsmithRegion.US),
+        langsmithIncludeContent = preferences.getBoolean(P_LANGSMITH_INCLUDE_CONTENT, true),
     )
 
     fun save(settings: AppSettings) {
@@ -46,8 +51,13 @@ class SecureSettingsRepository(context: Context) {
             .putString(P_POSTPROCESS_PROMPT, settings.postprocessPrompt)
             .putString(P_REASONING_EFFORT, settings.reasoningEffort.trim())
             .putBoolean(P_CONTEXT_AWARE, settings.contextAwareFormatting)
+            .putBoolean(P_LANGSMITH_ENABLED, settings.langsmithEnabled)
+            .putString(P_LANGSMITH_PROJECT, settings.langsmithProject.trim())
+            .putString(P_LANGSMITH_REGION, settings.langsmithRegion.name)
+            .putBoolean(P_LANGSMITH_INCLUDE_CONTENT, settings.langsmithIncludeContent)
             .putString(P_TRANSCRIPTION_API_KEY, encrypt(settings.transcriptionApiKey))
             .putString(P_FORMAT_API_KEY, encrypt(settings.formatApiKey))
+            .putString(P_LANGSMITH_API_KEY, encrypt(settings.langsmithApiKey))
             .apply()
     }
 
@@ -104,5 +114,10 @@ class SecureSettingsRepository(context: Context) {
         const val P_POSTPROCESS_PROMPT = "postprocess_prompt"
         const val P_REASONING_EFFORT = "reasoning_effort"
         const val P_CONTEXT_AWARE = "context_aware"
+        const val P_LANGSMITH_ENABLED = "langsmith_enabled"
+        const val P_LANGSMITH_API_KEY = "langsmith_api_key"
+        const val P_LANGSMITH_PROJECT = "langsmith_project"
+        const val P_LANGSMITH_REGION = "langsmith_region"
+        const val P_LANGSMITH_INCLUDE_CONTENT = "langsmith_include_content"
     }
 }
