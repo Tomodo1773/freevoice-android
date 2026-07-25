@@ -1,0 +1,9 @@
+<resources>
+    <style name="Widget.FreeVoice.PageTitle" parent="Widget.FreeVoice.PageTitle.Base">
+        <item name="android:accessibilityHeading">true</item>
+    </style>
+
+    <style name="Widget.FreeVoice.SectionTitle" parent="Widget.FreeVoice.SectionTitle.Base">
+        <item name="android:accessibilityHeading">true</item>
+    </style>
+</resources>

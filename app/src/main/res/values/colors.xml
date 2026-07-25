@@ -1,4 +1,17 @@
 <resources>
+    <color name="fv_background">#EFF7F8</color>
+    <color name="fv_surface">#FFFFFF</color>
+    <color name="fv_on_surface">#0F2429</color>
+    <color name="fv_muted">#4C6169</color>
+    <color name="fv_primary">#00838F</color>
+    <color name="fv_primary_container">#B7ECEF</color>
+    <color name="fv_divider">#D2E3E6</color>
+    <color name="fv_error">#BA1A1A</color>
+    <color name="fv_warning">#8A5100</color>
+    <color name="fv_transparent">#00000000</color>
+    <color name="fv_gradient_start">#33C7A8</color>
+    <color name="fv_gradient_end">#38B6F5</color>
+
     <!-- IME palette: intentionally neutral so the primary action stays prominent. -->
     <color name="ime_background">#F3F6F7</color>
     <color name="ime_surface">#FFFFFF</color>

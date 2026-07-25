@@ -1,7 +1,56 @@
 <resources>
     <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#006C4C</item>
+        <item name="android:colorAccent">@color/fv_primary</item>
+        <item name="android:navigationBarColor">@color/fv_surface</item>
+        <item name="android:statusBarColor">@color/fv_surface</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">@color/fv_background</item>
+    </style>
+
+    <style name="Widget.FreeVoice.PageTitle.Base" parent="">
+        <item name="android:textColor">@color/fv_on_surface</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="Widget.FreeVoice.PageTitle" parent="Widget.FreeVoice.PageTitle.Base" />
+
+    <style name="Widget.FreeVoice.SectionTitle.Base" parent="">
+        <item name="android:textColor">@color/fv_on_surface</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="Widget.FreeVoice.SectionTitle" parent="Widget.FreeVoice.SectionTitle.Base" />
+
+    <style name="Widget.FreeVoice.FieldLabel" parent="">
+        <item name="android:textColor">@color/fv_muted</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingBottom">2dp</item>
+    </style>
+
+    <style name="Widget.FreeVoice.Note" parent="">
+        <item name="android:textColor">@color/fv_muted</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:lineSpacingExtra">2dp</item>
+    </style>
+
+    <style name="Widget.FreeVoice.Tab" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:background">@drawable/fv_tab_background</item>
+        <item name="android:button">@null</item>
+        <item name="android:gravity">center</item>
+        <item name="android:minWidth">82dp</item>
+        <item name="android:paddingLeft">14dp</item>
+        <item name="android:paddingRight">14dp</item>
+        <item name="android:textColor">@color/fv_tab_text</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
     </style>
 
     <style name="Widget.FreeVoice.ImeKey" parent="">

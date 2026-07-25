@@ -1,10 +1,12 @@
-# FreeVoice Android 開発方針
+# FreeVoice Android
 
-Windows版由来の音声入力設計を Kotlin IME として実装する。Windowsのクリップボード・フック・オーバーレイは持ち込まず、`InputConnection.commitText()` を使う。
+日本語で簡潔に書く。Windows版とはコードを共有せず、設計とプロンプトだけを移植する。
 
-- 日本語、YAGNI/KISS/DRY、明示状態、単一ジョブ所有を守る。
-- 正常系を小さく保ち、cancel・ライフサイクル・非同期完了の競合をテストする。
-- 依存は最小限。依存取得は `sfw` 必須、offline Gradle は例外。
-- APIキー・署名鍵は出力やGitへ入れない。
+- YAGNI / KISS / DRY。状態は明示し、音声入力ジョブの所有者は常に1つ。
+- 正常系を先に保ち、cancel・画面遷移・二重開始などの競合をテストする。
+- 外部依存は最小にする。ビルドは `--offline` を基本とする。依存追加はメジャーで枯れたもののみ採用し、素性不明なものは根拠付きで相談する（Socket Firewall Free は JVM/Gradle 非対応のため `sfw` は効かない）。
+- APIキーや `.signing/` を表示・コミットしない。
 
-詳細な単一ジョブ判断は `docs/adr/0001-ime-single-job-ownership.md`。
+主要コマンド: `.\gradlew.bat --offline assembleDebug`、`.\gradlew.bat --offline assembleRelease`、`.\gradlew.bat --offline :app:signingReport`。依存を新規取得する初回のみ `--offline` を外す。
+
+構成: `ime/` は InputMethodService と単一ジョブ制御、`audio/` は WAV 録音、`network/` は Azure/OpenAI、`data/` は暗号化設定、`context/` はアプリ単位話題メモ。

@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipToPadding="false"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingTop="20dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="32dp">
+
+        <TextView
+            style="@style/Widget.FreeVoice.PageTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/model_settings_title" />
+
+        <TextView
+            style="@style/Widget.FreeVoice.Note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/settings_security_note" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/fv_card_background"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                style="@style/Widget.FreeVoice.SectionTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/transcription_title" />
+
+            <TextView
+                style="@style/Widget.FreeVoice.FieldLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:labelFor="@id/model_transcription_provider"
+                android:text="@string/provider" />
+
+            <Spinner
+                android:id="@+id/model_transcription_provider"
+                android:layout_width="match_parent"
+                android:layout_height="48dp" />
+
+            <LinearLayout
+                android:id="@+id/model_transcription_endpoint_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/Widget.FreeVoice.FieldLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:labelFor="@id/model_transcription_endpoint"
+                    android:text="@string/transcription_endpoint" />
+
+                <EditText
+                    android:id="@+id/model_transcription_endpoint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:importantForAutofill="no"
+                    android:inputType="textUri"
+                    android:maxLines="1" />
+
+                <TextView
+                    style="@style/Widget.FreeVoice.Note"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/azure_openai_endpoint_example" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/model_speech_endpoint_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/Widget.FreeVoice.FieldLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:labelFor="@id/model_speech_endpoint"
+                    android:text="@string/speech_endpoint" />
+
+                <EditText
+                    android:id="@+id/model_speech_endpoint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:importantForAutofill="no"
+                    android:inputType="textUri"
+                    android:maxLines="1" />
+
+                <TextView
+                    style="@style/Widget.FreeVoice.Note"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/speech_endpoint_example" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/Widget.FreeVoice.FieldLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:labelFor="@id/model_transcription_api_key"
+                android:text="@string/transcription_api_key" />
+
+            <EditText
+                android:id="@+id/model_transcription_api_key"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:importantForAutofill="no"
+                android:inputType="textPassword"
+                android:maxLines="1"
+                android:saveEnabled="false" />
+
+            <LinearLayout
+                android:id="@+id/model_transcription_model_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/Widget.FreeVoice.FieldLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:labelFor="@id/model_transcription_model"
+                    android:text="@string/transcription_model" />
+
+                <EditText
+                    android:id="@+id/model_transcription_model"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:importantForAutofill="no"
+                    android:inputType="text"
+                    android:maxLines="1" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/model_speech_language_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/Widget.FreeVoice.FieldLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:labelFor="@id/model_speech_language"
+                    android:text="@string/speech_language" />
+
+                <EditText
+                    android:id="@+id/model_speech_language"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:importantForAutofill="no"
+                    android:inputType="text"
+                    android:maxLines="1" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/fv_card_background"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                style="@style/Widget.FreeVoice.SectionTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/formatting_title" />
+
+            <Switch
+                android:id="@+id/model_format_enabled"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minHeight="48dp"
+                android:text="@string/format_enabled" />
+
+            <LinearLayout
+                android:id="@+id/model_format_fields"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/Widget.FreeVoice.FieldLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:labelFor="@id/model_format_provider"
+                    android:text="@string/provider" />
+
+                <Spinner
+                    android:id="@+id/model_format_provider"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp" />
+
+                <LinearLayout
+                    android:id="@+id/model_format_endpoint_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/Widget.FreeVoice.FieldLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:labelFor="@id/model_format_endpoint"
+                        android:text="@string/format_endpoint" />
+
+                    <EditText
+                        android:id="@+id/model_format_endpoint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:importantForAutofill="no"
+                        android:inputType="textUri"
+                        android:maxLines="1" />
+
+                    <TextView
+                        style="@style/Widget.FreeVoice.Note"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/format_endpoint_example" />
+                </LinearLayout>
+
+                <TextView
+                    style="@style/Widget.FreeVoice.FieldLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:labelFor="@id/model_format_api_key"
+                    android:text="@string/format_api_key" />
+
+                <EditText
+                    android:id="@+id/model_format_api_key"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:importantForAutofill="no"
+                    android:inputType="textPassword"
+                    android:maxLines="1"
+                    android:saveEnabled="false" />
+
+                <TextView
+                    style="@style/Widget.FreeVoice.FieldLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:labelFor="@id/model_format_model"
+                    android:text="@string/format_model" />
+
+                <EditText
+                    android:id="@+id/model_format_model"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:importantForAutofill="no"
+                    android:inputType="text"
+                    android:maxLines="1" />
+
+                <TextView
+                    style="@style/Widget.FreeVoice.FieldLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:labelFor="@id/model_reasoning_effort"
+                    android:text="@string/reasoning_effort" />
+
+                <Spinner
+                    android:id="@+id/model_reasoning_effort"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp" />
+
+                <Switch
+                    android:id="@+id/model_context_aware"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:minHeight="48dp"
+                    android:text="@string/context_aware_formatting" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/model_save_status"
+            style="@style/Widget.FreeVoice.Note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:accessibilityLiveRegion="polite" />
+
+        <Button
+            android:id="@+id/model_save_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:minHeight="48dp"
+            android:text="@string/save" />
+    </LinearLayout>
+</ScrollView>
