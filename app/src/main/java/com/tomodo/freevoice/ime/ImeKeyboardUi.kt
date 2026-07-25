@@ -154,22 +154,25 @@ internal class ImeKeyboardUi(
     private fun color(id: Int): Int = binding.root.context.getColor(id)
     private fun drawable(id: Int): Drawable? = binding.root.context.getDrawable(id)
 
+    /**
+     * システムのナビゲーションバー（戻る矢印・IME 切替）とキーが重ならないよう、
+     * キーボード本体の下にその高さぶんのスペーサーを積む。
+     * 本体は固定高なので、padding ではなくスペーサーの高さで全体を伸ばす。
+     */
     private fun applyNavigationBarInset() {
         val root = binding.root
-        val baseBottomPadding = root.paddingBottom
-        root.setOnApplyWindowInsetsListener { view, insets ->
+        root.setOnApplyWindowInsetsListener { _, insets ->
             val navigationBarBottom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 insets.getInsets(WindowInsets.Type.navigationBars()).bottom
             } else {
                 @Suppress("DEPRECATION")
                 insets.systemWindowInsetBottom
             }
-            view.setPadding(
-                view.paddingLeft,
-                view.paddingTop,
-                view.paddingRight,
-                baseBottomPadding + navigationBarBottom,
-            )
+            val spacer = binding.imeNavSpacer
+            if (spacer.layoutParams.height != navigationBarBottom) {
+                spacer.layoutParams.height = navigationBarBottom
+                spacer.requestLayout()
+            }
             insets
         }
         root.requestApplyInsets()

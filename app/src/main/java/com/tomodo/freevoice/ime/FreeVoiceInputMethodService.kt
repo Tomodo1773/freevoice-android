@@ -4,9 +4,11 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.inputmethodservice.InputMethodService
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.WindowInsetsController
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
@@ -81,6 +83,11 @@ class FreeVoiceInputMethodService : InputMethodService() {
             it.setEnterCommand(resolveImeEnterCommand(currentInputEditorInfo?.imeOptions ?: EditorInfo.IME_ACTION_NONE))
         }
         return binding.root
+    }
+
+    override fun onWindowShown() {
+        super.onWindowShown()
+        applyDarkNavigationBarIcons()
     }
 
     override fun onStartInputView(attribute: EditorInfo?, restarting: Boolean) {
@@ -178,6 +185,24 @@ class FreeVoiceInputMethodService : InputMethodService() {
     private fun openSettings() {
         cancelVoiceInput()
         startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    /**
+     * キーボード背景が明るいので、ナビゲーションバーのアイコンを暗色にして視認できるようにする。
+     * targetSdk 35 以降は navigationBarColor が無視されるため、色ではなく明暗の指定で合わせる。
+     */
+    private fun applyDarkNavigationBarIcons() {
+        val decorView = window?.window?.decorView ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            decorView.windowInsetsController?.setSystemBarsAppearance(
+                WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            decorView.systemUiVisibility =
+                decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        }
     }
 
     private fun clearTarget(jobId: Long? = null) {
