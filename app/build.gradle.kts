@@ -17,6 +17,10 @@ android {
     namespace = "com.tomodo.freevoice"
     compileSdk = 36
 
+    buildFeatures {
+        viewBinding = true
+    }
+
     defaultConfig {
         applicationId = "com.tomodo.freevoice"
         minSdk = 26

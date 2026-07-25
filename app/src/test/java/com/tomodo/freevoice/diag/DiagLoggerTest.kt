@@ -26,7 +26,7 @@ class DiagLoggerTest {
         assertTrue(bytes.size <= 180)
         assertTrue(file.readText().endsWith("\n"))
         logger.read().lineSequence().filter(String::isNotEmpty).forEach {
-            assertTrue(it.matches(Regex("""\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} 日本語ログ-\d+""")))
+            assertTrue(it.matches(Regex("""\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} INFO \[app] 日本語ログ-\d+""")))
         }
         assertTrue(logger.read().contains("日本語ログ-11"))
         assertFalse(logger.read().contains("日本語ログ-0\n"))
@@ -64,5 +64,21 @@ class DiagLoggerTest {
         assertFalse(latest.contains("api-key"))
         assertTrue(latest.contains("middle"))
         assertTrue(latest.contains("Authorization: <redacted>"))
+    }
+
+    @Test
+    fun levelsAndSourcesAreAvailableToTheUi() {
+        val file = temporaryFolder.newFile()
+        val logger = DiagLogger(file, now = { Date(0) })
+        logger.info("ime", "committed")
+        logger.warn("context", "fallback")
+        logger.error("voice", "failed", IllegalStateException("bad"))
+
+        assertEquals(
+            listOf(DiagLevel.INFO, DiagLevel.WARN, DiagLevel.ERROR),
+            logger.readLatestEntries(10).map(DiagEntry::level),
+        )
+        assertEquals(listOf("ime", "context", "voice"), logger.readLatestEntries(10).map(DiagEntry::source))
+        assertTrue(logger.readLatestEntries(1).single().message.contains("IllegalStateException"))
     }
 }

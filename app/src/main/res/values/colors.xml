@@ -1,0 +1,19 @@
+<resources>
+    <!-- IME palette: intentionally neutral so the primary action stays prominent. -->
+    <color name="ime_background">#F3F6F7</color>
+    <color name="ime_surface">#FFFFFF</color>
+    <color name="ime_on_surface">#172A30</color>
+    <color name="ime_muted">#566A71</color>
+    <color name="ime_key_pressed">#DFE8EA</color>
+    <color name="ime_key_disabled">#E8EDEE</color>
+    <color name="ime_key_outline">#D7E0E2</color>
+    <color name="ime_primary">#087F8C</color>
+    <color name="ime_primary_pressed">#086B75</color>
+    <color name="ime_primary_disabled">#AABABC</color>
+    <color name="ime_status_idle">#789096</color>
+    <color name="ime_status_recording">#D94040</color>
+    <color name="ime_status_processing">#087F8C</color>
+    <color name="ime_error">#B3261E</color>
+    <color name="ime_error_container">#FFF0EF</color>
+    <color name="ime_error_container_pressed">#F8D7D4</color>
+</resources>

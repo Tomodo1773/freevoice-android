@@ -63,7 +63,7 @@ class VoiceInputControllerTest {
     @Test fun `mic tap starts stops or ignores according to state`() {
         assertEquals(MicTapAction.Start, VoiceInputState.Idle.micTapAction())
         assertEquals(MicTapAction.Start, VoiceInputState.Error("retry").micTapAction())
-        assertEquals(MicTapAction.Stop, VoiceInputState.Recording.micTapAction())
+        assertEquals(MicTapAction.Stop, VoiceInputState.Recording(0L).micTapAction())
         assertEquals(MicTapAction.Ignore, VoiceInputState.Starting.micTapAction())
         assertEquals(MicTapAction.Ignore, VoiceInputState.Transcribing.micTapAction())
         assertEquals(MicTapAction.Ignore, VoiceInputState.Formatting.micTapAction())
