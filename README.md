@@ -8,13 +8,15 @@ Android のカスタム IME（キーボード）として動く、個人用の�
 - Android SDK 36
 - AGP 8.11.1 / Kotlin 2.2.20 / minSdk 26
 
-外部依存は最小限に保つ。初回の依存取得を伴う Gradle 実行は必ず Socket Firewall 経由で行う。
+外部依存は最小限に保つ。依存取得済みの環境では `--offline` でビルド・テストする。
 
-```sh
-sfw .\gradlew.bat assembleRelease
+```powershell
+.\gradlew.bat --offline testDebugUnitTest lintDebug assembleDebug
 ```
 
-署名済み release APK を `dist/FreeVoice-0.1.0.apk` として配布する。release 署名と配布用コピーの手順はリリース時に実行する。キャッシュだけを使う確認は `.\gradlew.bat --offline …` でよい。
+初回だけ `--offline` を外して依存を取得する。Socket Firewall Free は JVM / Gradle に未対応のため、依存追加時は内容と配布元を確認する。
+
+署名済み release APK を `dist/FreeVoice-0.1.0.apk` として配布する。release 署名と配布用コピーの手順はリリース時に実行する。
 
 ## 端末のセットアップ
 
