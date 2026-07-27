@@ -1,4 +1,4 @@
 plugins {
-    id("com.android.application") version "8.11.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+    // AGP 9 は Kotlin コンパイルを内蔵するので、kotlin.android プラグインは適用しない。
+    id("com.android.application") version "9.3.1" apply false
 }

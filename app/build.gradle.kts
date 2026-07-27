@@ -1,9 +1,7 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 val localSigningPropertiesFile = rootProject.file(".signing/signing.properties")
@@ -64,6 +62,7 @@ android {
         }
     }
 
+    // Kotlin の jvmTarget は AGP 内蔵 Kotlin が targetCompatibility に合わせる。
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -78,17 +77,11 @@ android {
 private fun Properties.required(key: String): String =
     getProperty(key)?.takeIf(String::isNotBlank) ?: error(".signing/signing.properties の $key が未設定です")
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
-}
-
 dependencies {
     // Azure Speech の連続認識（WebSocket）。REST と違い発話中に認識が進む。
     implementation("com.microsoft.cognitiveservices.speech:client-sdk:1.50.0")
 
     testImplementation("junit:junit:4.13.2")
     // android.jar の org.json はスタブなので、JVM テストでは実装を差す。
-    testImplementation("org.json:json:20250107")
+    testImplementation("org.json:json:20260522")
 }
