@@ -1,17 +1,60 @@
 version: 2
 updates:
-  - package-ecosystem: gradle
-    directory: /
+  # Gradle依存関係の更新設定
+  - package-ecosystem: "gradle"
+    directory: "/"
     schedule:
-      interval: weekly
-      day: monday
-      timezone: Asia/Tokyo
-    open-pull-requests-limit: 5
+      interval: "weekly"
+      day: "monday"
+      timezone: "Asia/Tokyo"
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+    groups:
+      # version-updatesを1つのPRにグループ化
+      gradle-version:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      # security-updatesを1つのPRにグループ化
+      gradle-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "gradle"
+    commit-message:
+      prefix: "deps(gradle)"
+      prefix-development: "deps(gradle)"
 
-  - package-ecosystem: github-actions
-    directory: /
+  # GitHub Actionsの更新設定
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
-      interval: weekly
-      day: monday
-      timezone: Asia/Tokyo
-    open-pull-requests-limit: 5
+      interval: "weekly"
+      day: "monday"
+      timezone: "Asia/Tokyo"
+    cooldown:
+      default-days: 7
+    groups:
+      # version-updatesを1つのPRにグループ化
+      github-actions-version:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      # security-updatesを1つのPRにグループ化
+      github-actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "deps(github-actions)"
+      prefix-development: "deps(github-actions)"
