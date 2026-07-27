@@ -85,13 +85,4 @@ class ImeKeyboardUiStateTest {
         assertEquals("01:00", formatRecordingElapsed(60_000L))
         assertEquals("120:00", formatRecordingElapsed(7_200_000L))
     }
-
-    @Test
-    fun `interim text keeps only the tail so the status stays on one line`() {
-        assertEquals("", interimTail(""))
-        assertEquals("", interimTail("   "))
-        assertEquals("今日の会議", interimTail("  今日の会議  "))
-        assertEquals("今日の会議の件", interimTail("今日の会議の件", maxChars = 7))
-        assertEquals("…議の件", interimTail("今日の会議の件", maxChars = 3))
-    }
 }

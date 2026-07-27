@@ -4,9 +4,9 @@
     <string name="ime_idle">タップして話す</string>
     <string name="ime_starting">録音を準備中…</string>
     <string name="ime_recording_time">録音中 %1$s</string>
+    <string name="ime_listening">聞いています…</string>
     <string name="ime_transcribing">文字起こし中…</string>
     <string name="ime_formatting">文章を整形中…</string>
-    <string name="ime_switch">切替</string>
     <string name="ime_cancel">取消</string>
     <string name="ime_record_start">話す</string>
     <string name="ime_record_stop">終了して送信</string>

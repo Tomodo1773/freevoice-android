@@ -11,7 +11,6 @@ import android.view.View
 import android.view.WindowInsetsController
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.InputMethodManager
 import com.tomodo.freevoice.MainActivity
 import com.tomodo.freevoice.context.TopicContextStore
 import com.tomodo.freevoice.data.SecureSettingsRepository
@@ -84,7 +83,6 @@ class FreeVoiceInputMethodService : InputMethodService() {
             actions = object : ImeKeyboardUi.Actions {
                 override fun onMic() = onMicTapped()
                 override fun onCancel() = cancelVoiceInput()
-                override fun onSwitchKeyboard() = showKeyboardPicker()
                 override fun onOpenSettings() = openSettings()
                 override fun onSpace() = editor.insertSpace()
                 override fun onDelete() = editor.deleteBackward()
@@ -199,11 +197,6 @@ class FreeVoiceInputMethodService : InputMethodService() {
             runCatching { Class.forName("com.microsoft.cognitiveservices.speech.SpeechConfig") }
                 .onFailure { diagnostics.warn("speech", "SDK warm-up failed", it) }
         }, "FreeVoiceSpeechWarmup").start()
-    }
-
-    private fun showKeyboardPicker() {
-        cancelVoiceInput()
-        getSystemService(InputMethodManager::class.java).showInputMethodPicker()
     }
 
     private fun openSettings() {
