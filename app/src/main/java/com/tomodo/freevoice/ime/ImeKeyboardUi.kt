@@ -79,55 +79,31 @@ internal class ImeKeyboardUi(
 
     private fun renderStatus() {
         val current = state ?: return
-        if (current.statusKind == ImeStatusKind.RECORDING) {
-            val elapsed = (
-                elapsedRealtimeMillis() - requireNotNull(current.recordingStartedAtMillis)
-            ).coerceAtLeast(0L)
-            val time = formatRecordingElapsed(elapsed)
-            binding.imeTimer.visibility = View.VISIBLE
-            binding.imeTimer.text = time
-            binding.imeTimer.contentDescription = text(R.string.ime_recording_time, time)
-            val interim = interimText.takeLast(INTERIM_SAFETY_CAP)
-            // 最初の認識結果が届くまでの間もメッセージ行を空にしない。
-            if (interim.isEmpty()) showMessage(text(R.string.ime_listening)) else showInterim(interim)
-        } else {
+        val line = statusLineFor(current, interimText, elapsedRealtimeMillis())
+        applyTimer(line.timer)
+        applyMessage(line.message)
+        binding.imeStatusIndicator.setTextColor(color(line.indicatorColorRes))
+    }
+
+    private fun applyTimer(timer: String?) {
+        if (timer == null) {
             binding.imeTimer.visibility = View.GONE
-            showMessage(
-                when (current.statusKind) {
-                    ImeStatusKind.IDLE -> text(R.string.ime_idle)
-                    ImeStatusKind.STARTING -> text(R.string.ime_starting)
-                    ImeStatusKind.TRANSCRIBING -> text(R.string.ime_transcribing)
-                    ImeStatusKind.FORMATTING -> text(R.string.ime_formatting)
-                    ImeStatusKind.ERROR -> current.errorMessage.orEmpty()
-                    ImeStatusKind.RECORDING -> ""
-                },
-            )
+            return
         }
-        binding.imeStatusIndicator.setTextColor(
-            color(
-                when (current.statusKind) {
-                    ImeStatusKind.RECORDING -> R.color.ime_status_recording
-                    ImeStatusKind.STARTING,
-                    ImeStatusKind.TRANSCRIBING,
-                    ImeStatusKind.FORMATTING,
-                    -> R.color.ime_status_processing
-                    ImeStatusKind.ERROR -> R.color.ime_error
-                    ImeStatusKind.IDLE -> R.color.ime_status_idle
-                },
-            ),
-        )
+        binding.imeTimer.visibility = View.VISIBLE
+        binding.imeTimer.text = timer
+        binding.imeTimer.contentDescription = text(R.string.ime_recording_time, timer)
     }
 
-    /** 案内・状態文言。頭から読ませたいので、溢れたら末尾を省略する。 */
-    private fun showMessage(message: String) {
-        binding.imeStatus.ellipsize = TextUtils.TruncateAt.END
-        binding.imeStatus.text = message
-    }
-
-    /** 認識中のテキスト。いま話した末尾を残したいので、先頭側を省略する。 */
-    private fun showInterim(interim: String) {
-        binding.imeStatus.ellipsize = TextUtils.TruncateAt.START
-        binding.imeStatus.text = interim
+    private fun applyMessage(message: ImeStatusMessage) {
+        val (body, ellipsize) = when (message) {
+            is ImeStatusMessage.Guidance -> text(message.textRes) to TextUtils.TruncateAt.END
+            is ImeStatusMessage.Failure -> message.body to TextUtils.TruncateAt.END
+            is ImeStatusMessage.Interim -> message.body to TextUtils.TruncateAt.START
+        }
+        // setEllipsize は requestLayout を誘発するので、録音中の毎秒更新で無駄に呼ばない。
+        if (binding.imeStatus.ellipsize != ellipsize) binding.imeStatus.ellipsize = ellipsize
+        binding.imeStatus.text = body
     }
 
     private fun renderPrimaryAction(current: ImeKeyboardUiState) {
@@ -192,12 +168,9 @@ internal class ImeKeyboardUi(
     private fun drawable(id: Int): Drawable? = binding.root.context.getDrawable(id)
 
     /**
-     * システムのナビゲーションバー（戻る矢印・IME 切替）とキーが重ならないよう、
-     * キーボード本体の下にその高さぶんのスペーサーを積む。
-     * 本体の padding ではなく本体の外側にスペーサーを足すことで、
+     * システムのナビゲーションバーとキーが重ならないよう、キーボード本体の下に
+     * その高さぶんのスペーサーを積む。本体の padding ではなく外側に足すことで、
      * インセットの変化がキーの高さや配置に影響しないようにする。
-     * （本体側の paddingBottom は誤タップ防止の緩衝地帯で、これとは別物。
-     * レイアウト XML の ime_nav_spacer / ime_keyboard_root のコメント参照）
      */
     private fun applyNavigationBarInset() {
         val root = binding.root
@@ -223,6 +196,3 @@ internal fun formatRecordingElapsed(elapsedMillis: Long): String {
     val totalSeconds = elapsedMillis.coerceAtLeast(0L) / 1_000L
     return String.format(Locale.ROOT, "%02d:%02d", totalSeconds / 60L, totalSeconds % 60L)
 }
-
-/** 末尾の見せ方は TextView の ellipsize(START) に任せる。ここでは描画コスト対策のみ。 */
-private const val INTERIM_SAFETY_CAP = 50
