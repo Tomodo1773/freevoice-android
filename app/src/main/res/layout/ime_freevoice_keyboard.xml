@@ -8,12 +8,9 @@
 
     <!--
       キーボード本体。高さは中身の合計。
-      システムのナビゲーションバー（戻る矢印・IME切替アイコン）と重ならないようにする役目は
-      下の ime_nav_spacer が担う（高さはインセットに応じて実行時に決まる）。
-      paddingBottom はそれとは別に、最下段キーが spacer との境界ぎりぎりに来て
-      誤タップしないよう置いている固定の緩衝地帯。数値上は 240dp を決めた際の
-      端数（28dp）に由来するが、キー下の見た目の余裕として意図的に残しているので、
-      「使われていない余白」と誤解して削らないこと。
+      ナビゲーションバーと重ならないようにする役目は下の ime_nav_spacer が担う
+      （高さはインセットに応じて実行時に決まる）。
+      paddingBottom はそれとは別の、キー下に見せる余白。
     -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -22,7 +19,7 @@
         android:paddingStart="10dp"
         android:paddingTop="8dp"
         android:paddingEnd="10dp"
-        android:paddingBottom="38dp">
+        android:paddingBottom="@dimen/ime_keyboard_bottom_gap">
 
         <!--
           ブランドは独立した行にする。取消ボタンと同じ行に置くと、行の高さが
@@ -63,11 +60,11 @@
 
         <!--
           状態行。ドット・経過時間・メッセージ・取消をまとめて持つ。
-          高さは取消ボタンのタップ領域で決まる。
+          高さは取消ボタンのタップ領域（48dp）に合わせる。
         -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="40dp"
+            android:layout_height="48dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -105,6 +102,8 @@
               - 案内・状態文言: 末尾を省略
               - 認識中のテキスト: 先頭を省略（末尾＝いま話した内容を残すため）
               どの状態でも必ず何か出るので、この行が空になることはない。
+              1行に収めるのは maxLines ではなく singleLine。maxLines=1 だと
+              ellipsize=start が効かず、末尾から削られて逆の結果になる。
             -->
             <TextView
                 android:id="@+id/ime_status"
@@ -123,9 +122,8 @@
                 android:id="@+id/ime_cancel"
                 style="@style/Widget.FreeVoice.ImeTextKey"
                 android:layout_width="64dp"
-                android:layout_height="40dp"
+                android:layout_height="48dp"
                 android:layout_marginStart="4dp"
-                android:minHeight="40dp"
                 android:background="@drawable/ime_cancel_background"
                 android:minWidth="64dp"
                 android:text="@string/ime_cancel"
@@ -202,11 +200,8 @@
     </LinearLayout>
 
     <!--
-      システムのナビゲーションバー（戻る矢印・IME切替アイコン）が実際に重なる領域。
-      キーとナビバーが重ならないようにしているのはこの View（高さは
-      ImeKeyboardUi.applyNavigationBarInset() が navigationBars() インセットから設定する）。
-      ここにはキーを置かない。上の本体側の paddingBottom はこれとは別の、
-      キー下の誤タップ防止用の固定の緩衝地帯。
+      システムのナビゲーションバーが重なる領域。ここにはキーを置かない。
+      高さは ImeKeyboardUi.applyNavigationBarInset() が実行時に設定する。
     -->
     <View
         android:id="@+id/ime_nav_spacer"

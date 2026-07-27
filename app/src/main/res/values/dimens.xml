@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      最下段キーの下に置く余白。ナビゲーションバーぶんは ime_nav_spacer が別に確保するので、
+      この値は「キーの下にどれだけ余白を見せるか」だけで決めてよい。
+    -->
+    <dimen name="ime_keyboard_bottom_gap">30dp</dimen>
+</resources>
