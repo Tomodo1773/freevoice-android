@@ -151,14 +151,21 @@
             android:orientation="horizontal"
             android:weightSum="5.5">
 
-            <Button
+            <!--
+              アイコンのキーは Button + drawableStart にしない。
+              compound drawable は gravity を無視して content box の端に置かれるので、
+              文字を持たないキーではアイコンが左端に寄ってしまう。
+              ImageButton なら src が scaleType に従うので中央に置ける。
+            -->
+            <ImageButton
                 android:id="@+id/ime_settings"
                 style="@style/Widget.FreeVoice.ImeIconKey"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
                 android:layout_weight="1.1"
                 android:contentDescription="@string/ime_settings"
-                android:drawableStart="@drawable/ic_ime_settings" />
+                android:scaleType="center"
+                android:src="@drawable/ic_ime_settings" />
 
             <Button
                 android:id="@+id/ime_space"
@@ -170,7 +177,7 @@
                 android:contentDescription="@string/ime_space_description"
                 android:text="@string/ime_space" />
 
-            <Button
+            <ImageButton
                 android:id="@+id/ime_delete"
                 style="@style/Widget.FreeVoice.ImeIconKey"
                 android:layout_width="0dp"
@@ -178,9 +185,10 @@
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
                 android:contentDescription="@string/ime_delete"
-                android:drawableStart="@drawable/ic_ime_backspace" />
+                android:scaleType="center"
+                android:src="@drawable/ic_ime_backspace" />
 
-            <Button
+            <ImageButton
                 android:id="@+id/ime_enter"
                 style="@style/Widget.FreeVoice.ImeIconKey"
                 android:layout_width="0dp"
@@ -188,7 +196,8 @@
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
                 android:contentDescription="@string/ime_enter"
-                android:drawableStart="@drawable/ic_ime_enter" />
+                android:scaleType="center"
+                android:src="@drawable/ic_ime_enter" />
         </LinearLayout>
     </LinearLayout>
 
