@@ -6,32 +6,49 @@
     android:background="@drawable/ime_freevoice_background"
     android:orientation="vertical">
 
-    <!-- キーボード本体。高さは固定で、ナビゲーションバーの有無に影響されない。 -->
+    <!--
+      キーボード本体。高さは中身の合計。
+      システムのナビゲーションバー（戻る矢印・IME切替アイコン）と重ならないようにする役目は
+      下の ime_nav_spacer が担う（高さはインセットに応じて実行時に決まる）。
+      paddingBottom はそれとは別に、最下段キーが spacer との境界ぎりぎりに来て
+      誤タップしないよう置いている固定の緩衝地帯。数値上は 240dp を決めた際の
+      端数（28dp）に由来するが、キー下の見た目の余裕として意図的に残しているので、
+      「使われていない余白」と誤解して削らないこと。
+    -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="240dp"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingStart="10dp"
         android:paddingTop="8dp"
         android:paddingEnd="10dp"
-        android:paddingBottom="10dp">
+        android:paddingBottom="38dp">
 
+        <!--
+          ブランドは独立した行にする。取消ボタンと同じ行に置くと、行の高さが
+          ボタンのタップ領域に縛られて、小さい文字のまわりに大きな余白だけが残る。
+          高さは wrap_content（文字が必要とするぶんだけ）。
+          参考情報なので小さく控えめに。状態表示より目立たせない。
+        -->
+        <TextView
+            android:id="@+id/ime_brand"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif"
+            android:text="@string/app_name"
+            android:textColor="@color/ime_muted"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <!--
+          状態行。ドット・経過時間・メッセージ・取消をまとめて持つ。
+          高さは取消ボタンのタップ領域で決まる。
+        -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="40dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/ime_brand"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:fontFamily="sans-serif"
-                android:gravity="center_vertical"
-                android:text="@string/app_name"
-                android:textColor="@color/ime_on_surface"
-                android:textSize="15sp"
-                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/ime_status_indicator"
@@ -43,6 +60,31 @@
                 android:textColor="@color/ime_status_idle"
                 android:textSize="11sp" />
 
+            <!--
+              経過時間。本文とは別ビューにしている
+              （同じ TextView だと先頭省略のときに時間ごと消える）。
+              録音中以外は GONE にする。空文字のままだと marginEnd だけが残って
+              本文の開始位置がずれるため。
+            -->
+            <TextView
+                android:id="@+id/ime_timer"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="6dp"
+                android:fontFamily="sans-serif"
+                android:gravity="center_vertical"
+                android:textColor="@color/ime_muted"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <!--
+              メッセージ本文。左端のドットに合わせて常に左寄せにする
+              （文言だけ中央に来ると、行の起点が揃わず落ち着かない）。
+              ImeKeyboardUi が切り替えるのは省略の向きだけ:
+              - 案内・状態文言: 末尾を省略
+              - 認識中のテキスト: 先頭を省略（末尾＝いま話した内容を残すため）
+              どの状態でも必ず何か出るので、この行が空になることはない。
+            -->
             <TextView
                 android:id="@+id/ime_status"
                 android:layout_width="0dp"
@@ -50,8 +92,8 @@
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:fontFamily="sans-serif"
-                android:gravity="center_vertical"
-                android:maxLines="1"
+                android:gravity="start|center_vertical"
+                android:singleLine="true"
                 android:text="@string/ime_idle"
                 android:textColor="@color/ime_muted"
                 android:textSize="13sp" />
@@ -60,22 +102,14 @@
                 android:id="@+id/ime_cancel"
                 style="@style/Widget.FreeVoice.ImeTextKey"
                 android:layout_width="64dp"
-                android:layout_height="48dp"
+                android:layout_height="40dp"
                 android:layout_marginStart="4dp"
+                android:minHeight="40dp"
                 android:background="@drawable/ime_cancel_background"
                 android:minWidth="64dp"
                 android:text="@string/ime_cancel"
                 android:textColor="@color/ime_error"
                 android:visibility="gone" />
-
-            <Button
-                android:id="@+id/ime_settings"
-                style="@style/Widget.FreeVoice.ImeIconKey"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="4dp"
-                android:contentDescription="@string/ime_settings"
-                android:drawableStart="@drawable/ic_ime_settings" />
         </LinearLayout>
 
         <Button
@@ -97,13 +131,13 @@
             android:weightSum="5.5">
 
             <Button
-                android:id="@+id/ime_switch"
+                android:id="@+id/ime_settings"
                 style="@style/Widget.FreeVoice.ImeIconKey"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
                 android:layout_weight="1.1"
-                android:contentDescription="@string/ime_switch"
-                android:drawableStart="@drawable/ic_ime_switch_keyboard" />
+                android:contentDescription="@string/ime_settings"
+                android:drawableStart="@drawable/ic_ime_settings" />
 
             <Button
                 android:id="@+id/ime_space"
@@ -137,7 +171,13 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- システムのナビゲーションバー（戻る矢印・IME切替）が重なる領域。キーは置かない。 -->
+    <!--
+      システムのナビゲーションバー（戻る矢印・IME切替アイコン）が実際に重なる領域。
+      キーとナビバーが重ならないようにしているのはこの View（高さは
+      ImeKeyboardUi.applyNavigationBarInset() が navigationBars() インセットから設定する）。
+      ここにはキーを置かない。上の本体側の paddingBottom はこれとは別の、
+      キー下の誤タップ防止用の固定の緩衝地帯。
+    -->
     <View
         android:id="@+id/ime_nav_spacer"
         android:layout_width="match_parent"

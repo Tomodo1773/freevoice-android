@@ -4,6 +4,7 @@ import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.text.TextUtils
 import android.view.View
 import android.view.WindowInsets
 import com.tomodo.freevoice.R
@@ -18,7 +19,6 @@ internal class ImeKeyboardUi(
     interface Actions {
         fun onMic()
         fun onCancel()
-        fun onSwitchKeyboard()
         fun onOpenSettings()
         fun onSpace()
         fun onDelete()
@@ -44,7 +44,6 @@ internal class ImeKeyboardUi(
         applyNavigationBarInset()
         binding.imeMic.setOnClickListener { actions.onMic() }
         binding.imeCancel.setOnClickListener { actions.onCancel() }
-        binding.imeSwitch.setOnClickListener { actions.onSwitchKeyboard() }
         binding.imeSettings.setOnClickListener { actions.onOpenSettings() }
         binding.imeSpace.setOnClickListener { actions.onSpace() }
         binding.imeDelete.setOnClickListener { actions.onDelete() }
@@ -80,20 +79,29 @@ internal class ImeKeyboardUi(
 
     private fun renderStatus() {
         val current = state ?: return
-        binding.imeStatus.text = when (current.statusKind) {
-            ImeStatusKind.IDLE -> text(R.string.ime_idle)
-            ImeStatusKind.STARTING -> text(R.string.ime_starting)
-            ImeStatusKind.RECORDING -> {
-                val elapsed = (
-                    elapsedRealtimeMillis() - requireNotNull(current.recordingStartedAtMillis)
-                ).coerceAtLeast(0L)
-                val time = text(R.string.ime_recording_time, formatRecordingElapsed(elapsed))
-                val tail = interimTail(interimText)
-                if (tail.isEmpty()) time else "$time $tail"
-            }
-            ImeStatusKind.TRANSCRIBING -> text(R.string.ime_transcribing)
-            ImeStatusKind.FORMATTING -> text(R.string.ime_formatting)
-            ImeStatusKind.ERROR -> current.errorMessage.orEmpty()
+        if (current.statusKind == ImeStatusKind.RECORDING) {
+            val elapsed = (
+                elapsedRealtimeMillis() - requireNotNull(current.recordingStartedAtMillis)
+            ).coerceAtLeast(0L)
+            val time = formatRecordingElapsed(elapsed)
+            binding.imeTimer.visibility = View.VISIBLE
+            binding.imeTimer.text = time
+            binding.imeTimer.contentDescription = text(R.string.ime_recording_time, time)
+            val interim = interimText.takeLast(INTERIM_SAFETY_CAP)
+            // 最初の認識結果が届くまでの間もメッセージ行を空にしない。
+            if (interim.isEmpty()) showMessage(text(R.string.ime_listening)) else showInterim(interim)
+        } else {
+            binding.imeTimer.visibility = View.GONE
+            showMessage(
+                when (current.statusKind) {
+                    ImeStatusKind.IDLE -> text(R.string.ime_idle)
+                    ImeStatusKind.STARTING -> text(R.string.ime_starting)
+                    ImeStatusKind.TRANSCRIBING -> text(R.string.ime_transcribing)
+                    ImeStatusKind.FORMATTING -> text(R.string.ime_formatting)
+                    ImeStatusKind.ERROR -> current.errorMessage.orEmpty()
+                    ImeStatusKind.RECORDING -> ""
+                },
+            )
         }
         binding.imeStatusIndicator.setTextColor(
             color(
@@ -108,6 +116,18 @@ internal class ImeKeyboardUi(
                 },
             ),
         )
+    }
+
+    /** 案内・状態文言。頭から読ませたいので、溢れたら末尾を省略する。 */
+    private fun showMessage(message: String) {
+        binding.imeStatus.ellipsize = TextUtils.TruncateAt.END
+        binding.imeStatus.text = message
+    }
+
+    /** 認識中のテキスト。いま話した末尾を残したいので、先頭側を省略する。 */
+    private fun showInterim(interim: String) {
+        binding.imeStatus.ellipsize = TextUtils.TruncateAt.START
+        binding.imeStatus.text = interim
     }
 
     private fun renderPrimaryAction(current: ImeKeyboardUiState) {
@@ -174,7 +194,10 @@ internal class ImeKeyboardUi(
     /**
      * システムのナビゲーションバー（戻る矢印・IME 切替）とキーが重ならないよう、
      * キーボード本体の下にその高さぶんのスペーサーを積む。
-     * 本体は固定高なので、padding ではなくスペーサーの高さで全体を伸ばす。
+     * 本体の padding ではなく本体の外側にスペーサーを足すことで、
+     * インセットの変化がキーの高さや配置に影響しないようにする。
+     * （本体側の paddingBottom は誤タップ防止の緩衝地帯で、これとは別物。
+     * レイアウト XML の ime_nav_spacer / ime_keyboard_root のコメント参照）
      */
     private fun applyNavigationBarInset() {
         val root = binding.root
@@ -201,11 +224,5 @@ internal fun formatRecordingElapsed(elapsedMillis: Long): String {
     return String.format(Locale.ROOT, "%02d:%02d", totalSeconds / 60L, totalSeconds % 60L)
 }
 
-/** ステータス行は1行しかないので、認識中のテキストは末尾だけを見せる。 */
-internal fun interimTail(text: String, maxChars: Int = INTERIM_TAIL_CHARS): String {
-    val trimmed = text.trim()
-    if (trimmed.length <= maxChars) return trimmed
-    return "…" + trimmed.takeLast(maxChars)
-}
-
-private const val INTERIM_TAIL_CHARS = 18
+/** 末尾の見せ方は TextView の ellipsize(START) に任せる。ここでは描画コスト対策のみ。 */
+private const val INTERIM_SAFETY_CAP = 50
