@@ -60,19 +60,10 @@ internal class StreamingVoiceSession(
 
     override fun finish(): String {
         synchronized(lock) { stopping = true }
-
-        // 再接続の途中なら決着を待つ。待ち切れなくても停止は進める。
-        worker.shutdown()
-        val settled = try {
-            worker.awaitTermination(RECONNECT_SETTLE_MS, TimeUnit.MILLISECONDS)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            false
-        }
-        if (!settled) {
-            diagnostics.warn("speech", "reconnect did not settle before stop")
-            worker.shutdownNow()
-        }
+        // shutdownNow は録音上限タイマーと再接続待ちの sleep を即座に打ち切る。
+        // 再接続が openRecognizer() の途中でも、そちらの stopping チェックが
+        // 新しい recognizer をこのセッションに握らせないので、待つ必要はない。
+        worker.shutdownNow()
 
         try {
             synchronized(lock) { recognizer }
@@ -144,7 +135,7 @@ internal class StreamingVoiceSession(
             }
 
             synchronized(lock) {
-                check(!closed) { "Session already closed" }
+                check(!closed && !stopping) { "Session already closed or stopping" }
                 recognizer = newRecognizer
                 config = newConfig
                 audio = newAudio
@@ -268,7 +259,6 @@ internal class StreamingVoiceSession(
     private companion object {
         const val MAX_RECONNECTS = 3
         const val RECONNECT_DELAY_MS = 1_000L
-        const val RECONNECT_SETTLE_MS = 5_000L
         const val STOP_TIMEOUT_MS = 5_000L
     }
 }
