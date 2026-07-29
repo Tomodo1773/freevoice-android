@@ -64,8 +64,8 @@
     <string name="save_needs_setup">保存した。入力を始めるには: %1$s</string>
     <string name="prompt_title">フォーマット用プロンプト</string>
     <string name="prompt_hint">後処理時に system role として渡すプロンプト</string>
-    <string name="restore_default">デフォルトに戻す</string>
-    <string name="prompt_restored">デフォルトへ戻した。保存すると反映される。</string>
+    <string name="show_default_prompt">デフォルトを見る</string>
+    <string name="default_prompt_title">デフォルトプロンプト</string>
     <string name="history_title">入力履歴</string>
     <string name="history_empty">履歴はまだない。音声入力するとここに表示される。</string>
     <string name="history_clear">履歴を消去</string>
@@ -79,6 +79,7 @@
     <string name="diagnostics_clear_confirm">診断ログをすべて消去する？</string>
     <string name="clear">消去</string>
     <string name="cancel">キャンセル</string>
+    <string name="close">閉じる</string>
     <string name="copy">コピー</string>
     <string name="copied">コピーした。</string>
 </resources>
