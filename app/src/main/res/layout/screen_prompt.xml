@@ -47,13 +47,13 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/prompt_restore_button"
+            android:id="@+id/prompt_default_button"
             style="?android:attr/buttonBarButtonStyle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:minHeight="48dp"
-            android:text="@string/restore_default" />
+            android:text="@string/show_default_prompt" />
 
         <Button
             android:id="@+id/prompt_save_button"
