@@ -113,6 +113,27 @@ class KeyRepeaterTest {
     }
 
     @Test
+    fun `touch stays on the key while the finger only drifts within slop`() {
+        val width = 120
+        val height = 168
+        val slop = 8
+
+        assertTrue(isInsideKey(60f, 84f, width, height, slop))
+        assertTrue(isInsideKey(-slop.toFloat(), -slop.toFloat(), width, height, slop))
+        assertTrue(isInsideKey(width + slop.toFloat(), height + slop.toFloat(), width, height, slop))
+    }
+
+    @Test
+    fun `touch leaves the key once the finger passes slop`() {
+        val width = 120
+        val height = 168
+        val slop = 8
+
+        assertTrue(!isInsideKey(-slop - 1f, 84f, width, height, slop))
+        assertTrue(!isInsideKey(60f, height + slop + 1f, width, height, slop))
+    }
+
+    @Test
     fun `repeat waits longest before the first repeat and speeds up while held`() {
         val hold = keyRepeatDelayMillis(0)
         val early = keyRepeatDelayMillis(1)

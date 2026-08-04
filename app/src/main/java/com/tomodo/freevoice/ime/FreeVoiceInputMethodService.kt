@@ -107,6 +107,11 @@ class FreeVoiceInputMethodService : InputMethodService() {
         )
     }
 
+    override fun onFinishInputView(finishingInput: Boolean) {
+        keyboardUi?.releaseKeys()
+        super.onFinishInputView(finishingInput)
+    }
+
     override fun onFinishInput() {
         cancelVoiceInput()
         super.onFinishInput()
