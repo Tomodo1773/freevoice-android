@@ -15,7 +15,7 @@
     <string name="ime_settings">設定</string>
     <string name="ime_space">空白</string>
     <string name="ime_space_description">空白を入力</string>
-    <string name="ime_delete">一文字削除</string>
+    <string name="ime_delete">削除（長押しで連続削除）</string>
     <string name="ime_enter">改行</string>
     <string name="ime_enter_go">移動</string>
     <string name="ime_enter_search">検索</string>

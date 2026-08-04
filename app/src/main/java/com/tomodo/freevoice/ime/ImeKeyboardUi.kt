@@ -1,10 +1,12 @@
 package com.tomodo.freevoice.ime
 
+import android.annotation.SuppressLint
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import com.tomodo.freevoice.R
@@ -39,6 +41,11 @@ internal class ImeKeyboardUi(
             handler.postDelayed(this, 1_000L)
         }
     }
+    private val deleteRepeater = KeyRepeater(
+        onRepeat = { actions.onDelete() },
+        schedule = { delayMillis, action -> handler.postDelayed(action, delayMillis) },
+        unschedule = { action -> handler.removeCallbacks(action) },
+    )
 
     init {
         applyNavigationBarInset()
@@ -46,9 +53,39 @@ internal class ImeKeyboardUi(
         binding.imeCancel.setOnClickListener { actions.onCancel() }
         binding.imeSettings.setOnClickListener { actions.onOpenSettings() }
         binding.imeSpace.setOnClickListener { actions.onSpace() }
-        binding.imeDelete.setOnClickListener { actions.onDelete() }
+        bindDeleteKey()
         binding.imeEnter.setOnClickListener { actions.onEnter() }
     }
+
+    /**
+     * 削除キーは押した瞬間に1文字消し、離すまで繰り返す。タッチを消費するので
+     * OnClickListener はタッチ経由では呼ばれず、TalkBack などの performClick だけが
+     * 通る。押下の所有者は KeyRepeater 1つで、UP・CANCEL・キー外への移動で必ず止める。
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun bindDeleteKey() {
+        val key = binding.imeDelete
+        key.setOnClickListener { actions.onDelete() }
+        key.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    view.isPressed = true
+                    deleteRepeater.press()
+                }
+                MotionEvent.ACTION_MOVE -> if (!view.containsTouch(event)) stopDeleteRepeat(view)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> stopDeleteRepeat(view)
+            }
+            true
+        }
+    }
+
+    private fun stopDeleteRepeat(view: View) {
+        view.isPressed = false
+        deleteRepeater.release()
+    }
+
+    private fun View.containsTouch(event: MotionEvent): Boolean =
+        event.x >= 0f && event.y >= 0f && event.x <= width && event.y <= height
 
     fun render(next: ImeKeyboardUiState) {
         state = next
@@ -72,6 +109,7 @@ internal class ImeKeyboardUi(
     }
 
     fun close() {
+        deleteRepeater.release()
         handler.removeCallbacks(recordingTick)
         state = null
         interimText = ""
