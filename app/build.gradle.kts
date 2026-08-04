@@ -19,6 +19,15 @@ android {
         viewBinding = true
     }
 
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/io.netty.versions.properties",
+            )
+        }
+    }
+
     defaultConfig {
         applicationId = "com.tomodo.freevoice"
         minSdk = 26
