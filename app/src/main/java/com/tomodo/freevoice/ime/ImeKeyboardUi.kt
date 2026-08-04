@@ -21,6 +21,8 @@ internal class ImeKeyboardUi(
         fun onCancel()
         fun onOpenSettings()
         fun onSpace()
+
+        /** 削除キーは長押しでリピートするので、押している間くり返し呼ばれる。 */
         fun onDelete()
         fun onEnter()
     }
@@ -39,6 +41,7 @@ internal class ImeKeyboardUi(
             handler.postDelayed(this, 1_000L)
         }
     }
+    private val deleteRepeater: KeyRepeater
 
     init {
         applyNavigationBarInset()
@@ -46,7 +49,8 @@ internal class ImeKeyboardUi(
         binding.imeCancel.setOnClickListener { actions.onCancel() }
         binding.imeSettings.setOnClickListener { actions.onOpenSettings() }
         binding.imeSpace.setOnClickListener { actions.onSpace() }
-        binding.imeDelete.setOnClickListener { actions.onDelete() }
+        // 削除だけは1タップ1文字では長文に足りないので、押している間リピートさせる。
+        deleteRepeater = binding.imeDelete.bindAsRepeatingKey(handler) { actions.onDelete() }
         binding.imeEnter.setOnClickListener { actions.onEnter() }
     }
 
@@ -71,7 +75,16 @@ internal class ImeKeyboardUi(
         binding.imeEnter.contentDescription = binding.root.context.getString(command.descriptionRes())
     }
 
+    /**
+     * 指が離れないまま入力ビューが消える経路では ACTION_UP が届かない。
+     * リピートが生き残ると次の入力先の文字を消し続けるので、必ずここで止める。
+     */
+    fun releaseKeys() {
+        deleteRepeater.release()
+    }
+
     fun close() {
+        releaseKeys()
         handler.removeCallbacks(recordingTick)
         state = null
         interimText = ""
