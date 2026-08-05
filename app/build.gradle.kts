@@ -11,6 +11,20 @@ val localSigningProperties = Properties().apply {
     }
 }
 
+val ciSigningStoreFile = providers.environmentVariable("ANDROID_KEYSTORE_PATH").orNull
+val ciSigningStorePassword = providers.environmentVariable("ANDROID_STORE_PASSWORD").orNull
+val ciSigningKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
+val ciSigningKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
+val hasCiSigning = listOf(
+    ciSigningStoreFile,
+    ciSigningStorePassword,
+    ciSigningKeyAlias,
+    ciSigningKeyPassword,
+).all { !it.isNullOrBlank() }
+
+val releaseVersionCode = providers.gradleProperty("releaseVersionCode").orElse("1")
+val releaseVersionName = providers.gradleProperty("releaseVersionName").orElse("0.1.0")
+
 android {
     namespace = "com.tomodo.freevoice"
     compileSdk = 36
@@ -23,8 +37,8 @@ android {
         applicationId = "com.tomodo.freevoice"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = releaseVersionCode.get().toInt()
+        versionName = releaseVersionName.get()
 
         // Speech SDK はネイティブライブラリを ABI ごとに同梱する。実機とエミュレータの
         // ぶんだけ残し、APK が不要に膨らまないようにする。
@@ -33,13 +47,20 @@ android {
         }
     }
 
-    if (localSigningPropertiesFile.isFile) {
+    if (hasCiSigning || localSigningPropertiesFile.isFile) {
         signingConfigs {
             create("localRelease") {
-                storeFile = localSigningPropertiesFile.parentFile.resolve(localSigningProperties.required("storeFile"))
-                storePassword = localSigningProperties.required("storePassword")
-                keyAlias = localSigningProperties.required("keyAlias")
-                keyPassword = localSigningProperties.required("keyPassword")
+                if (hasCiSigning) {
+                    storeFile = rootProject.file(checkNotNull(ciSigningStoreFile))
+                    storePassword = checkNotNull(ciSigningStorePassword)
+                    keyAlias = checkNotNull(ciSigningKeyAlias)
+                    keyPassword = checkNotNull(ciSigningKeyPassword)
+                } else {
+                    storeFile = localSigningPropertiesFile.parentFile.resolve(localSigningProperties.required("storeFile"))
+                    storePassword = localSigningProperties.required("storePassword")
+                    keyAlias = localSigningProperties.required("keyAlias")
+                    keyPassword = localSigningProperties.required("keyPassword")
+                }
             }
         }
     }
@@ -56,7 +77,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            if (localSigningPropertiesFile.isFile) {
+            if (hasCiSigning || localSigningPropertiesFile.isFile) {
                 signingConfig = signingConfigs.getByName("localRelease")
             }
         }
