@@ -1,6 +1,6 @@
 ---
 name: tag
-description: FreeVoice Androidの次のSemVerリリースタグを安全に決定・作成・GitHubへpushし、署名済みAPKのGitHub Releaseを開始・確認する。ユーザーが「タグを付けて」「バージョンを上げて」「リリースして」「APKを公開して」「タグ付与」など、Android版の新バージョン公開を依頼したときに使う。
+description: FreeVoice Androidの次のSemVerリリースタグを安全に決定・作成・GitHubへpushし、署名済みAPKのGitHub Releaseを開始する。ユーザーが「タグを付けて」「バージョンを上げて」「リリースして」「APKを公開して」「タグ付与」など、Android版の新バージョン公開を依頼したときに使う。
 ---
 
 # Android Release Tag
@@ -14,6 +14,7 @@ description: FreeVoice Androidの次のSemVerリリースタグを安全に決�
 - タグはローカル作業ブランチや未コミット変更ではなく、必ず最新の `origin/main` に付ける。
 - 署名鍵やパスワードを表示・取得・変更しない。確認するのはSecret名の存在だけにする。
 - 新しいタグ、対象コミット、含まれる変更を提示し、タグ作成前にユーザーの確認を得る。ユーザーが今回の依頼で正確なタグを明示済みなら再確認は不要。
+- タグpush後はActionsやReleaseをポーリング・監視しない。状態確認はユーザーが後から明示的に依頼した場合だけ行う。
 
 ## 1. リリース前確認
 
@@ -96,11 +97,8 @@ git tag -a $newTag $mainSha -m "Release $newTag"
 git push origin "refs/tags/$newTag"
 ```
 
-## 5. Releaseを確認する
+## 5. 完了を報告する
 
-タグpush後、対応するReleaseワークフローを特定して完了まで監視する。成功後、GitHub Releaseに次があることを確認する。
+タグpushが成功したら、タグと対象SHAを報告して直ちに終了する。ReleaseワークフローはGitHubに任せ、`gh run watch`、繰り返しの `gh run list`、ReleaseやAPKの出現待ちは行わない。Release状態を成功と断定もしない。
 
-- `FreeVoice-<version>.apk`
-- `FreeVoice-<version>.apk.sha256`
-
-失敗時はActionsログを調べるが、タグを移動・削除しない。完了報告にはタグ、対象SHA、Release URL、APK名を含める。
+必要ならActionsページとReleasesページへのリンクだけを案内する。状態確認はユーザーから別途依頼されたときに行う。
