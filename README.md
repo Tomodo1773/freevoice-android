@@ -16,11 +16,11 @@ Android のカスタム IME（キーボード）として動く、個人用の�
 
 初回だけ `--offline` を外して依存を取得する。Socket Firewall Free は JVM / Gradle に未対応のため、依存追加時は内容と配布元を確認する。
 
-署名済み release APK を `dist/FreeVoice-0.1.0.apk` として配布する。release 署名と配布用コピーの手順はリリース時に実行する。
+署名済み release APK は [GitHub Releases](../../releases) からダウンロードする。
 
 ## 端末のセットアップ
 
-対象は Android 8 以降。端末で「提供元不明のアプリ」のインストールを許可してから、`dist/FreeVoice-0.1.0.apk`（release版）をインストールする。
+対象は Android 8 以降。端末で「提供元不明のアプリ」のインストールを許可してから、GitHub Releases の `FreeVoice-<version>.apk` をインストールする。
 
 1. FreeVoice を開き、マイク権限と API 情報を設定する。
 2. 「キーボード設定を開く」から FreeVoice 音声入力を有効にする。
@@ -43,3 +43,18 @@ API キーは Android Keystore の AES/GCM 鍵で暗号化して SharedPreferenc
 ## 配布用 APK の署名
 
 配布 APK は release 署名を使う。更新互換性のため、`.signing/signing.properties` とキーストアは安全な場所へバックアップし、Git には絶対に入れない。署名ファイルがない開発環境でも、unsigned release の設定評価はできる。
+
+GitHub Actions から配布する場合は、リポジトリの Actions secrets に以下を登録する。
+
+- `ANDROID_KEYSTORE_BASE64`: release キーストアを Base64 化した値
+- `ANDROID_STORE_PASSWORD`: キーストアのパスワード
+- `ANDROID_KEY_ALIAS`: 署名鍵のエイリアス
+- `ANDROID_KEY_PASSWORD`: 署名鍵のパスワード
+
+既存キーストアは PowerShell でBase64化し、クリップボードへコピーできる。
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes(".signing\freevoice-release.jks")) | Set-Clipboard
+```
+
+`v0.1.1` のような `vMAJOR.MINOR.PATCH` タグを push すると、テスト・lint・署名確認後にAPKとSHA-256ファイルをGitHub Releaseへ公開する。端末の既存release版は、同じ署名鍵かつ新しいバージョンなら上書き更新できる。
