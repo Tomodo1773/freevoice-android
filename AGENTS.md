@@ -11,4 +11,4 @@
 
 構成: `ime/` は InputMethodService と単一ジョブ制御、`audio/` は WAV 録音、`network/` は Azure/OpenAI、`data/` は暗号化設定、`context/` はアプリ単位話題メモ。
 
-同期: `AGENTS.md` と `CLAUDE.md`、`.agents/skills` と `.claude/skills` は同じ内容の別実体。シンボリックリンクは使わない（Windows で `git worktree` が失敗するため）。片方だけ変更せず両方を揃えてコミットする。クローン後に `git config core.hooksPath .githooks` で検証hookを有効化する（CIでも検証する）。
+同期: `AGENTS.md` と `CLAUDE.md`、`.agents/skills` と `.claude/skills` は同じ内容の別実体。片方を変更したら、もう一方も揃える。クローン後に `git config core.hooksPath .githooks` を実行する。
