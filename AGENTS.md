@@ -10,3 +10,5 @@
 主要コマンド: `.\gradlew.bat --offline assembleDebug`、`.\gradlew.bat --offline assembleRelease`、`.\gradlew.bat --offline :app:signingReport`。依存を新規取得する初回のみ `--offline` を外す。
 
 構成: `ime/` は InputMethodService と単一ジョブ制御、`audio/` は WAV 録音、`network/` は Azure/OpenAI、`data/` は暗号化設定、`context/` はアプリ単位話題メモ。
+
+同期: `AGENTS.md` と `CLAUDE.md`、`.agents/skills` と `.claude/skills` は同じ内容の別実体。シンボリックリンクは使わない（Windows で `git worktree` が失敗するため）。片方だけ変更せず両方を揃えてコミットする。クローン後に `git config core.hooksPath .githooks` で検証hookを有効化する（CIでも検証する）。

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Android Release Tag"
+  short_description: "Safely create Android SemVer release tags"
+  default_prompt: "Use $tag to inspect changes since the latest release and safely publish the next Android version tag."
