@@ -33,6 +33,15 @@ android {
         viewBinding = true
     }
 
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/io.netty.versions.properties",
+            )
+        }
+    }
+
     defaultConfig {
         applicationId = "com.tomodo.freevoice"
         minSdk = 26
@@ -100,9 +109,9 @@ private fun Properties.required(key: String): String =
 
 dependencies {
     // Azure Speech の連続認識（WebSocket）。REST と違い発話中に認識が進む。
-    implementation("com.microsoft.cognitiveservices.speech:client-sdk:1.50.0")
+    implementation("com.microsoft.cognitiveservices.speech:client-sdk:1.51.1")
 
     testImplementation("junit:junit:4.13.2")
     // android.jar の org.json はスタブなので、JVM テストでは実装を差す。
-    testImplementation("org.json:json:20260522")
+    testImplementation("org.json:json:20260719")
 }
