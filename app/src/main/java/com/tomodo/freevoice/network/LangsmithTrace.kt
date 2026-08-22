@@ -1,6 +1,7 @@
 package com.tomodo.freevoice.network
 
 import com.tomodo.freevoice.data.AppSettings
+import com.tomodo.freevoice.data.FormatProvider
 import com.tomodo.freevoice.data.LangsmithRegion
 import org.json.JSONArray
 import org.json.JSONObject
@@ -44,7 +45,7 @@ data class ChatMessage(val role: String, val content: String)
 /** LLM 呼び出し 1 回分。時刻は System.currentTimeMillis() を想定する。 */
 data class LlmSpan(
     val spanName: String,
-    val provider: ChatProvider,
+    val provider: FormatProvider,
     val requestModel: String,
     val responseModel: String? = null,
     val messages: List<ChatMessage> = emptyList(),
@@ -70,7 +71,11 @@ fun buildLlmSpanPayload(
     spanId: String,
 ): JSONObject {
     val attributes = JSONArray()
-        .put(strAttr("gen_ai.system", if (span.provider == ChatProvider.OPENAI) "openai" else "azure.openai"))
+        .put(strAttr("gen_ai.system", when (span.provider) {
+            FormatProvider.AZURE -> "azure.openai"
+            FormatProvider.OPENAI -> "openai"
+            FormatProvider.GEMINI -> "gcp.gemini"
+        }))
         .put(strAttr("gen_ai.operation.name", "chat"))
         .put(strAttr("gen_ai.request.model", span.requestModel))
         .put(strAttr("gen_ai.request.reasoning_effort", span.reasoningEffort))

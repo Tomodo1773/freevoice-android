@@ -38,4 +38,11 @@ class SettingsFieldVisibilityTest {
             settingsFieldVisibility(TranscriptionProvider.AZURE_OPENAI, FormatProvider.OPENAI).formatEndpoint,
         )
     }
+
+    @Test fun `gemini formatting hides azure endpoint`() {
+        assertEquals(
+            false,
+            settingsFieldVisibility(TranscriptionProvider.AZURE_OPENAI, FormatProvider.GEMINI).formatEndpoint,
+        )
+    }
 }

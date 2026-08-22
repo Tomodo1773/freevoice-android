@@ -10,9 +10,8 @@ class AzureEndpointsTest {
     @Test fun `transcription uses normalized endpoint and version`() {
         assertEquals("https://resource.openai.azure.com/openai/deployments/whisper/audio/transcriptions?api-version=2024-10-21", AzureEndpoints.transcription("https://resource.services.ai.azure.com/api/projects/foo", "whisper"))
     }
-    @Test fun `chat urls are deterministic`() {
+    @Test fun `azure chat url is deterministic`() {
         assertEquals("https://r.openai.azure.com/openai/v1/chat/completions", AzureEndpoints.azureChat("https://r.openai.azure.com/anything"))
-        assertEquals("https://api.openai.com/v1/chat/completions", AzureEndpoints.openAiChat())
     }
     @Test(expected = IllegalArgumentException::class) fun `non https endpoint fails`() { AzureEndpoints.normalizeOpenAiEndpoint("http://r.openai.azure.com") }
     @Test(expected = IllegalArgumentException::class) fun `hostless endpoint fails`() { AzureEndpoints.normalizeOpenAiEndpoint("https:///path") }

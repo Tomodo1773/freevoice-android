@@ -15,29 +15,31 @@ import javax.crypto.spec.GCMParameterSpec
 class SecureSettingsRepository(context: Context) {
     private val preferences = context.applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
 
-    fun load(): AppSettings = AppSettings(
-        transcriptionProvider = enum(P_TRANSCRIPTION_PROVIDER, TranscriptionProvider.AZURE_OPENAI),
-        transcriptionEndpoint = plain(P_TRANSCRIPTION_ENDPOINT),
-        transcriptionApiKey = secret(P_TRANSCRIPTION_API_KEY),
-        transcriptionModel = plain(P_TRANSCRIPTION_MODEL, "gpt-4o-transcribe"),
-        speechEndpoint = plain(P_SPEECH_ENDPOINT),
-        speechLanguage = plain(P_SPEECH_LANGUAGE, "ja-JP"),
-        formatEnabled = preferences.getBoolean(P_FORMAT_ENABLED, true),
-        formatProvider = enum(P_FORMAT_PROVIDER, FormatProvider.AZURE),
-        formatEndpoint = plain(P_FORMAT_ENDPOINT),
-        formatApiKey = secret(P_FORMAT_API_KEY),
-        formatModel = plain(P_FORMAT_MODEL, AppSettings.DEFAULT_FORMAT_MODEL),
-        postprocessPrompt = plain(P_POSTPROCESS_PROMPT, AppSettings.DEFAULT_POSTPROCESS_PROMPT),
-        reasoningEffort = plain(P_REASONING_EFFORT, AppSettings.DEFAULT_REASONING_EFFORT),
-        contextAwareFormatting = preferences.getBoolean(P_CONTEXT_AWARE, true),
-        langsmithEnabled = preferences.getBoolean(P_LANGSMITH_ENABLED, false),
-        langsmithApiKey = secret(P_LANGSMITH_API_KEY),
-        langsmithProject = plain(P_LANGSMITH_PROJECT, AppSettings.DEFAULT_LANGSMITH_PROJECT),
-        langsmithRegion = enum(P_LANGSMITH_REGION, LangsmithRegion.US),
-        langsmithIncludeContent = preferences.getBoolean(P_LANGSMITH_INCLUDE_CONTENT, true),
-    )
+    fun load(): AppSettings {
+        val formatProvider = enum(P_FORMAT_PROVIDER, FormatProvider.AZURE)
+        return AppSettings(
+            transcriptionProvider = enum(P_TRANSCRIPTION_PROVIDER, TranscriptionProvider.AZURE_OPENAI),
+            transcriptionEndpoint = plain(P_TRANSCRIPTION_ENDPOINT),
+            transcriptionApiKey = secret(P_TRANSCRIPTION_API_KEY),
+            transcriptionModel = plain(P_TRANSCRIPTION_MODEL, "gpt-4o-transcribe"),
+            speechEndpoint = plain(P_SPEECH_ENDPOINT),
+            speechLanguage = plain(P_SPEECH_LANGUAGE, "ja-JP"),
+            formatEnabled = preferences.getBoolean(P_FORMAT_ENABLED, true),
+            formatProvider = formatProvider,
+            formatProfiles = loadFormatProfiles(formatProvider),
+            postprocessPrompt = plain(P_POSTPROCESS_PROMPT, AppSettings.DEFAULT_POSTPROCESS_PROMPT),
+            reasoningEffort = plain(P_REASONING_EFFORT, AppSettings.DEFAULT_REASONING_EFFORT),
+            contextAwareFormatting = preferences.getBoolean(P_CONTEXT_AWARE, true),
+            langsmithEnabled = preferences.getBoolean(P_LANGSMITH_ENABLED, false),
+            langsmithApiKey = secret(P_LANGSMITH_API_KEY),
+            langsmithProject = plain(P_LANGSMITH_PROJECT, AppSettings.DEFAULT_LANGSMITH_PROJECT),
+            langsmithRegion = enum(P_LANGSMITH_REGION, LangsmithRegion.US),
+            langsmithIncludeContent = preferences.getBoolean(P_LANGSMITH_INCLUDE_CONTENT, true),
+        )
+    }
 
     fun save(settings: AppSettings) {
+        val profiles = settings.formatProfiles
         preferences.edit()
             .putString(P_TRANSCRIPTION_PROVIDER, settings.transcriptionProvider.name)
             .putString(P_TRANSCRIPTION_ENDPOINT, settings.transcriptionEndpoint.trim())
@@ -46,8 +48,10 @@ class SecureSettingsRepository(context: Context) {
             .putString(P_SPEECH_LANGUAGE, settings.speechLanguage.trim())
             .putBoolean(P_FORMAT_ENABLED, settings.formatEnabled)
             .putString(P_FORMAT_PROVIDER, settings.formatProvider.name)
-            .putString(P_FORMAT_ENDPOINT, settings.formatEndpoint.trim())
-            .putString(P_FORMAT_MODEL, settings.formatModel.trim())
+            .putString(P_FORMAT_AZURE_ENDPOINT, profiles.azure.endpoint.trim())
+            .putString(P_FORMAT_AZURE_MODEL, profiles.azure.model.trim())
+            .putString(P_FORMAT_OPENAI_MODEL, profiles.openAi.model.trim())
+            .putString(P_FORMAT_GEMINI_MODEL, profiles.gemini.model.trim())
             .putString(P_POSTPROCESS_PROMPT, settings.postprocessPrompt)
             .putString(P_REASONING_EFFORT, settings.reasoningEffort.trim())
             .putBoolean(P_CONTEXT_AWARE, settings.contextAwareFormatting)
@@ -56,9 +60,43 @@ class SecureSettingsRepository(context: Context) {
             .putString(P_LANGSMITH_REGION, settings.langsmithRegion.name)
             .putBoolean(P_LANGSMITH_INCLUDE_CONTENT, settings.langsmithIncludeContent)
             .putString(P_TRANSCRIPTION_API_KEY, encrypt(settings.transcriptionApiKey))
-            .putString(P_FORMAT_API_KEY, encrypt(settings.formatApiKey))
+            .putString(P_FORMAT_AZURE_API_KEY, encrypt(profiles.azure.apiKey))
+            .putString(P_FORMAT_OPENAI_API_KEY, encrypt(profiles.openAi.apiKey))
+            .putString(P_FORMAT_GEMINI_API_KEY, encrypt(profiles.gemini.apiKey))
             .putString(P_LANGSMITH_API_KEY, encrypt(settings.langsmithApiKey))
+            .remove(P_FORMAT_ENDPOINT)
+            .remove(P_FORMAT_API_KEY)
+            .remove(P_FORMAT_MODEL)
             .apply()
+    }
+
+    private fun loadFormatProfiles(legacyProvider: FormatProvider): FormatProfiles {
+        val defaults = FormatProfiles()
+        if (!preferences.contains(P_FORMAT_AZURE_MODEL)) {
+            return migrateLegacyFormatProfiles(
+                provider = legacyProvider,
+                profile = FormatProfile(
+                    endpoint = if (legacyProvider == FormatProvider.AZURE) plain(P_FORMAT_ENDPOINT) else "",
+                    apiKey = secret(P_FORMAT_API_KEY),
+                    model = plain(P_FORMAT_MODEL, defaults[legacyProvider].model),
+                ),
+            )
+        }
+        return FormatProfiles(
+            azure = FormatProfile(
+                endpoint = plain(P_FORMAT_AZURE_ENDPOINT),
+                apiKey = secret(P_FORMAT_AZURE_API_KEY),
+                model = plain(P_FORMAT_AZURE_MODEL, defaults.azure.model),
+            ),
+            openAi = FormatProfile(
+                apiKey = secret(P_FORMAT_OPENAI_API_KEY),
+                model = plain(P_FORMAT_OPENAI_MODEL, defaults.openAi.model),
+            ),
+            gemini = FormatProfile(
+                apiKey = secret(P_FORMAT_GEMINI_API_KEY),
+                model = plain(P_FORMAT_GEMINI_MODEL, defaults.gemini.model),
+            ),
+        )
     }
 
     private fun plain(key: String, fallback: String = "") = preferences.getString(key, fallback).orEmpty()
@@ -108,9 +146,17 @@ class SecureSettingsRepository(context: Context) {
         const val P_SPEECH_LANGUAGE = "speech_language"
         const val P_FORMAT_ENABLED = "format_enabled"
         const val P_FORMAT_PROVIDER = "format_provider"
+        // 旧版の単一設定。新形式がなければ移行元として読む。
         const val P_FORMAT_ENDPOINT = "format_endpoint"
         const val P_FORMAT_API_KEY = "format_api_key"
         const val P_FORMAT_MODEL = "format_model"
+        const val P_FORMAT_AZURE_ENDPOINT = "format_azure_endpoint"
+        const val P_FORMAT_AZURE_API_KEY = "format_azure_api_key"
+        const val P_FORMAT_AZURE_MODEL = "format_azure_model"
+        const val P_FORMAT_OPENAI_API_KEY = "format_openai_api_key"
+        const val P_FORMAT_OPENAI_MODEL = "format_openai_model"
+        const val P_FORMAT_GEMINI_API_KEY = "format_gemini_api_key"
+        const val P_FORMAT_GEMINI_MODEL = "format_gemini_model"
         const val P_POSTPROCESS_PROMPT = "postprocess_prompt"
         const val P_REASONING_EFFORT = "reasoning_effort"
         const val P_CONTEXT_AWARE = "context_aware"

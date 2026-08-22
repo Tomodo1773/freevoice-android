@@ -6,10 +6,22 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AppSettingsTest {
-    private fun valid() = AppSettings(transcriptionApiKey = "key", transcriptionEndpoint = "https://transcribe", formatEndpoint = "https://format", formatApiKey = "format-key")
+    private fun valid() = AppSettings(
+        transcriptionApiKey = "key",
+        transcriptionEndpoint = "https://transcribe",
+        formatProfiles = FormatProfiles(
+            azure = FormatProfile("https://format", "azure-key", DEFAULT_OPENAI_FORMAT_MODEL),
+            openAi = FormatProfile(apiKey = "openai-key", model = DEFAULT_OPENAI_FORMAT_MODEL),
+            gemini = FormatProfile(apiKey = "gemini-key", model = DEFAULT_GEMINI_FORMAT_MODEL),
+        ),
+    )
+
+    private fun AppSettings.withFormat(provider: FormatProvider, update: (FormatProfile) -> FormatProfile) =
+        copy(formatProfiles = formatProfiles.replacing(provider, update(formatProfiles[provider])))
+
     @Test fun `format defaults use terra with low reasoning`() {
         val settings = AppSettings()
-        assertEquals("gpt-5.6-terra", settings.formatModel)
+        assertEquals(DEFAULT_OPENAI_FORMAT_MODEL, settings.formatProfiles.azure.model)
         assertEquals("low", settings.reasoningEffort)
     }
     @Test fun `azure openai requires endpoint and model`() {
@@ -39,7 +51,22 @@ class AppSettingsTest {
     }
     @Test fun `format validation respects enabled and provider`() {
         assertNull(valid().copy(formatEnabled = false).validateForVoiceInput())
-        assertEquals("Azure 整形 API のエンドポイントを入力して", valid().copy(formatEndpoint = "").validateForVoiceInput())
-        assertNull(valid().copy(formatProvider = FormatProvider.OPENAI, formatEndpoint = "").validateForVoiceInput())
+        assertEquals(
+            "Azure 整形 API のエンドポイントを入力して",
+            valid().withFormat(FormatProvider.AZURE) { it.copy(endpoint = "") }.validateForVoiceInput(),
+        )
+        assertNull(valid().copy(formatProvider = FormatProvider.OPENAI).validateForVoiceInput())
+    }
+    @Test fun `gemini formatting requires key and model but not endpoint`() {
+        val gemini = valid().copy(formatProvider = FormatProvider.GEMINI)
+        assertNull(gemini.validateForVoiceInput())
+        assertEquals(
+            "整形 API キーを入力して",
+            gemini.withFormat(FormatProvider.GEMINI) { it.copy(apiKey = "") }.validateForVoiceInput(),
+        )
+        assertEquals(
+            "整形モデルを入力して",
+            gemini.withFormat(FormatProvider.GEMINI) { it.copy(model = "") }.validateForVoiceInput(),
+        )
     }
 }

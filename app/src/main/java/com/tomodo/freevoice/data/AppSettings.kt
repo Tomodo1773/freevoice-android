@@ -1,7 +1,6 @@
 package com.tomodo.freevoice.data
 
 enum class TranscriptionProvider { AZURE_OPENAI, AZURE_SPEECH }
-enum class FormatProvider { AZURE, OPENAI }
 enum class LangsmithRegion { US, EU }
 
 data class AppSettings(
@@ -13,9 +12,7 @@ data class AppSettings(
     val speechLanguage: String = "ja-JP",
     val formatEnabled: Boolean = true,
     val formatProvider: FormatProvider = FormatProvider.AZURE,
-    val formatEndpoint: String = "",
-    val formatApiKey: String = "",
-    val formatModel: String = DEFAULT_FORMAT_MODEL,
+    val formatProfiles: FormatProfiles = FormatProfiles(),
     val postprocessPrompt: String = DEFAULT_POSTPROCESS_PROMPT,
     val reasoningEffort: String = DEFAULT_REASONING_EFFORT,
     val contextAwareFormatting: Boolean = true,
@@ -28,7 +25,7 @@ data class AppSettings(
     /** null のとき、その設定で音声入力を開始できる。トレーシングは任意なので検証しない。 */
     fun validateForVoiceInput(): String? {
         if (transcriptionApiKey.isBlank()) return "文字起こし API キーを入力して"
-        return when (transcriptionProvider) {
+        val transcriptionError = when (transcriptionProvider) {
             TranscriptionProvider.AZURE_OPENAI -> when {
                 transcriptionEndpoint.isBlank() -> "Azure OpenAI のエンドポイントを入力して"
                 transcriptionModel.isBlank() -> "文字起こしモデルを入力して"
@@ -39,22 +36,31 @@ data class AppSettings(
                 speechLanguage.isBlank() -> "音声言語を入力して"
                 else -> validateUrl(speechEndpoint, "Azure Speech エンドポイント")
             }
-        } ?: if (formatEnabled) {
-            when {
-                formatProvider == FormatProvider.AZURE && formatEndpoint.isBlank() -> "Azure 整形 API のエンドポイントを入力して"
-                formatApiKey.isBlank() -> "整形 API キーを入力して"
-                formatModel.isBlank() -> "整形モデルを入力して"
-                formatProvider == FormatProvider.AZURE -> validateUrl(formatEndpoint, "Azure 整形エンドポイント")
+        }
+        if (transcriptionError != null) return transcriptionError
+        if (!formatEnabled) return null
+
+        val format = formatProfiles[formatProvider]
+        return when (formatProvider) {
+            FormatProvider.AZURE -> when {
+                format.endpoint.isBlank() -> "Azure 整形 API のエンドポイントを入力して"
+                format.apiKey.isBlank() -> "整形 API キーを入力して"
+                format.model.isBlank() -> "整形モデルを入力して"
+                else -> validateUrl(format.endpoint, "Azure 整形エンドポイント")
+            }
+            // OpenAI 互換の公開 API は endpoint を持たず、キーとモデルだけを要求する。
+            FormatProvider.OPENAI, FormatProvider.GEMINI -> when {
+                format.apiKey.isBlank() -> "整形 API キーを入力して"
+                format.model.isBlank() -> "整形モデルを入力して"
                 else -> null
             }
-        } else null
+        }
     }
 
     private fun validateUrl(value: String, label: String): String? =
         if (value.startsWith("https://")) null else "$label は https:// で始めて"
 
     companion object {
-        const val DEFAULT_FORMAT_MODEL = "gpt-5.6-terra"
         const val DEFAULT_REASONING_EFFORT = "low"
         const val DEFAULT_LANGSMITH_PROJECT = "freevoice"
         const val DEFAULT_POSTPROCESS_PROMPT = """音声文字起こしを、話者が最終的に意図した自然な文章へ整える。

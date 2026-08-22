@@ -1,6 +1,7 @@
 package com.tomodo.freevoice.network
 
 import com.tomodo.freevoice.data.AppSettings
+import com.tomodo.freevoice.data.FormatProvider
 import com.tomodo.freevoice.data.LangsmithRegion
 import org.json.JSONArray
 import org.json.JSONObject
@@ -186,10 +187,19 @@ class LangsmithTraceTest {
     @Test
     fun `openai provider maps to openai system`() {
         val attributes = buildLlmSpanPayload(
-            span().copy(provider = ChatProvider.OPENAI), "p", includeContent = false, traceId = "aa", spanId = "bb",
+            span().copy(provider = FormatProvider.OPENAI), "p", includeContent = false, traceId = "aa", spanId = "bb",
         ).span().attributes()
 
         assertEquals("openai", attributes.getValue("gen_ai.system"))
+    }
+
+    @Test
+    fun `gemini provider maps to gcp gemini system`() {
+        val attributes = buildLlmSpanPayload(
+            span().copy(provider = FormatProvider.GEMINI), "p", includeContent = false, traceId = "aa", spanId = "bb",
+        ).span().attributes()
+
+        assertEquals("gcp.gemini", attributes.getValue("gen_ai.system"))
     }
 
     @Test
@@ -203,7 +213,7 @@ class LangsmithTraceTest {
 
     private fun span() = LlmSpan(
         spanName = "format",
-        provider = ChatProvider.AZURE,
+        provider = FormatProvider.AZURE,
         requestModel = "gpt-5.6-terra",
         responseModel = "gpt-5.6-terra-2026",
         messages = listOf(ChatMessage("system", "校正して"), ChatMessage("user", "<校正対象>あー、てすと</校正対象>")),

@@ -6,6 +6,8 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import com.tomodo.freevoice.data.AppSettings
+import com.tomodo.freevoice.data.FormatProfile
+import com.tomodo.freevoice.data.FormatProfiles
 import com.tomodo.freevoice.data.FormatProvider
 import com.tomodo.freevoice.data.LangsmithRegion
 import com.tomodo.freevoice.data.TranscriptionProvider
@@ -17,19 +19,24 @@ internal class ModelSettingsScreen(
     val binding: ScreenModelSettingsBinding,
     onSave: () -> Unit,
 ) {
+    private var shownFormatProvider = FormatProvider.AZURE
+    private var formatProfiles = FormatProfiles()
+
     init {
         binding.modelTranscriptionProvider.adapter = adapter(arrayOf("Azure OpenAI", "Azure Speech"))
-        binding.modelFormatProvider.adapter = adapter(arrayOf("Azure OpenAI", "OpenAI"))
+        binding.modelFormatProvider.adapter = adapter(FORMAT_PROVIDERS.map { it.second }.toTypedArray())
         binding.modelReasoningEffort.adapter = adapter(REASONING_EFFORTS)
         binding.modelLangsmithRegion.adapter = adapter(LangsmithRegion.entries.map { it.name }.toTypedArray())
         binding.modelLangsmithEnabled.setOnCheckedChangeListener { _, _ -> renderVisibility() }
         binding.modelTranscriptionProvider.onSelectionChanged(::renderVisibility)
-        binding.modelFormatProvider.onSelectionChanged(::renderVisibility)
+        binding.modelFormatProvider.onSelectionChanged(::onFormatProviderSelected)
         binding.modelFormatEnabled.setOnCheckedChangeListener { _, _ -> renderVisibility() }
         binding.modelSaveButton.setOnClickListener { onSave() }
     }
 
     fun bind(settings: AppSettings) {
+        formatProfiles = settings.formatProfiles
+        shownFormatProvider = settings.formatProvider
         binding.modelTranscriptionProvider.setSelection(settings.transcriptionProvider.ordinal)
         binding.modelTranscriptionEndpoint.setText(settings.transcriptionEndpoint)
         binding.modelTranscriptionApiKey.setText(settings.transcriptionApiKey)
@@ -37,10 +44,8 @@ internal class ModelSettingsScreen(
         binding.modelSpeechEndpoint.setText(settings.speechEndpoint)
         binding.modelSpeechLanguage.setText(settings.speechLanguage)
         binding.modelFormatEnabled.isChecked = settings.formatEnabled
-        binding.modelFormatProvider.setSelection(settings.formatProvider.ordinal)
-        binding.modelFormatEndpoint.setText(settings.formatEndpoint)
-        binding.modelFormatApiKey.setText(settings.formatApiKey)
-        binding.modelFormatModel.setText(settings.formatModel)
+        showFormatProfile(formatProfiles[shownFormatProvider])
+        binding.modelFormatProvider.setSelection(FORMAT_PROVIDERS.indexOfFirst { it.first == settings.formatProvider })
         binding.modelReasoningEffort.setSelection(
             REASONING_EFFORTS.indexOf(settings.reasoningEffort)
                 .takeIf { it >= 0 }
@@ -55,46 +60,66 @@ internal class ModelSettingsScreen(
         renderVisibility()
     }
 
-    fun collect(base: AppSettings): AppSettings = base.copy(
-        transcriptionProvider = TranscriptionProvider.entries.getOrElse(
-            binding.modelTranscriptionProvider.selectedItemPosition,
-        ) { TranscriptionProvider.AZURE_OPENAI },
-        transcriptionEndpoint = binding.modelTranscriptionEndpoint.text.toString(),
-        transcriptionApiKey = binding.modelTranscriptionApiKey.text.toString(),
-        transcriptionModel = binding.modelTranscriptionModel.text.toString(),
-        speechEndpoint = binding.modelSpeechEndpoint.text.toString(),
-        speechLanguage = binding.modelSpeechLanguage.text.toString(),
-        formatEnabled = binding.modelFormatEnabled.isChecked,
-        formatProvider = FormatProvider.entries.getOrElse(
-            binding.modelFormatProvider.selectedItemPosition,
-        ) { FormatProvider.AZURE },
-        formatEndpoint = binding.modelFormatEndpoint.text.toString(),
-        formatApiKey = binding.modelFormatApiKey.text.toString(),
-        formatModel = binding.modelFormatModel.text.toString(),
-        reasoningEffort = binding.modelReasoningEffort.selectedItem?.toString()
-            ?: AppSettings.DEFAULT_REASONING_EFFORT,
-        contextAwareFormatting = binding.modelContextAware.isChecked,
-        langsmithEnabled = binding.modelLangsmithEnabled.isChecked,
-        langsmithApiKey = binding.modelLangsmithApiKey.text.toString(),
-        langsmithProject = binding.modelLangsmithProject.text.toString(),
-        langsmithRegion = LangsmithRegion.entries.getOrElse(
-            binding.modelLangsmithRegion.selectedItemPosition,
-        ) { LangsmithRegion.US },
-        langsmithIncludeContent = binding.modelLangsmithIncludeContent.isChecked,
-    )
+    fun collect(base: AppSettings): AppSettings {
+        formatProfiles = formatProfiles.replacing(shownFormatProvider, readFormatProfile())
+        return base.copy(
+            transcriptionProvider = TranscriptionProvider.entries.getOrElse(
+                binding.modelTranscriptionProvider.selectedItemPosition,
+            ) { TranscriptionProvider.AZURE_OPENAI },
+            transcriptionEndpoint = binding.modelTranscriptionEndpoint.text.toString(),
+            transcriptionApiKey = binding.modelTranscriptionApiKey.text.toString(),
+            transcriptionModel = binding.modelTranscriptionModel.text.toString(),
+            speechEndpoint = binding.modelSpeechEndpoint.text.toString(),
+            speechLanguage = binding.modelSpeechLanguage.text.toString(),
+            formatEnabled = binding.modelFormatEnabled.isChecked,
+            formatProvider = shownFormatProvider,
+            formatProfiles = formatProfiles,
+            reasoningEffort = binding.modelReasoningEffort.selectedItem?.toString()
+                ?: AppSettings.DEFAULT_REASONING_EFFORT,
+            contextAwareFormatting = binding.modelContextAware.isChecked,
+            langsmithEnabled = binding.modelLangsmithEnabled.isChecked,
+            langsmithApiKey = binding.modelLangsmithApiKey.text.toString(),
+            langsmithProject = binding.modelLangsmithProject.text.toString(),
+            langsmithRegion = LangsmithRegion.entries.getOrElse(
+                binding.modelLangsmithRegion.selectedItemPosition,
+            ) { LangsmithRegion.US },
+            langsmithIncludeContent = binding.modelLangsmithIncludeContent.isChecked,
+        )
+    }
 
     fun showStatus(message: String) {
         binding.modelSaveStatus.text = message
+    }
+
+    private fun onFormatProviderSelected() {
+        val nextProvider = FORMAT_PROVIDERS.getOrElse(
+            binding.modelFormatProvider.selectedItemPosition,
+        ) { FORMAT_PROVIDERS.first() }.first
+        if (shownFormatProvider != nextProvider) {
+            formatProfiles = formatProfiles.replacing(shownFormatProvider, readFormatProfile())
+            shownFormatProvider = nextProvider
+            showFormatProfile(formatProfiles[shownFormatProvider])
+        }
+        renderVisibility()
+    }
+
+    private fun readFormatProfile() = FormatProfile(
+        endpoint = binding.modelFormatEndpoint.text.toString(),
+        apiKey = binding.modelFormatApiKey.text.toString(),
+        model = binding.modelFormatModel.text.toString(),
+    )
+
+    private fun showFormatProfile(profile: FormatProfile) {
+        binding.modelFormatEndpoint.setText(profile.endpoint)
+        binding.modelFormatApiKey.setText(profile.apiKey)
+        binding.modelFormatModel.setText(profile.model)
     }
 
     private fun renderVisibility() {
         val transcription = TranscriptionProvider.entries.getOrElse(
             binding.modelTranscriptionProvider.selectedItemPosition,
         ) { TranscriptionProvider.AZURE_OPENAI }
-        val format = FormatProvider.entries.getOrElse(
-            binding.modelFormatProvider.selectedItemPosition,
-        ) { FormatProvider.AZURE }
-        val fields = settingsFieldVisibility(transcription, format)
+        val fields = settingsFieldVisibility(transcription, shownFormatProvider)
         binding.modelTranscriptionEndpointRow.isVisible = fields.transcriptionEndpoint
         binding.modelTranscriptionModelRow.isVisible = fields.transcriptionModel
         binding.modelSpeechEndpointRow.isVisible = fields.speechEndpoint
@@ -129,6 +154,11 @@ internal class ModelSettingsScreen(
         }
 
     companion object {
+        private val FORMAT_PROVIDERS = listOf(
+            FormatProvider.AZURE to "Azure OpenAI",
+            FormatProvider.OPENAI to "OpenAI",
+            FormatProvider.GEMINI to "Gemini",
+        )
         private val REASONING_EFFORTS = arrayOf("none", "low", "medium", "high")
     }
 }
