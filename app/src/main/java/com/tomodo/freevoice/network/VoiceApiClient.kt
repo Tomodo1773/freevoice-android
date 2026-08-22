@@ -10,21 +10,48 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 
-enum class ChatProvider { AZURE, OPENAI }
 data class FormatResult(val text: String, val fallback: Boolean, val fallbackReason: String? = null)
+data class FormatApiConfig(
+    val provider: FormatProvider = FormatProvider.AZURE,
+    val endpoint: String = "",
+    val apiKey: String = "",
+    val model: String = "",
+    val reasoningEffort: String = "",
+)
 data class VoiceApiConfig(
     val azureOpenAiBaseUrl: String = "", val azureOpenAiKey: String = "", val transcriptionDeployment: String = "",
-    val chatDeployment: String = "", val chatBaseUrl: String = "", val chatApiKey: String = "",
-    val chatProvider: ChatProvider = ChatProvider.AZURE, val reasoningEffort: String = ""
+    val format: FormatApiConfig = FormatApiConfig(),
 )
 
 // Azure Speech はここを通らない。Speech SDK が設定から直接ストリーミング接続する。
-fun AppSettings.toVoiceApiConfig() = VoiceApiConfig(
-    azureOpenAiBaseUrl = transcriptionEndpoint, azureOpenAiKey = transcriptionApiKey, transcriptionDeployment = transcriptionModel,
-    chatDeployment = formatModel, chatBaseUrl = formatEndpoint, chatApiKey = formatApiKey,
-    chatProvider = if (formatProvider == FormatProvider.AZURE) ChatProvider.AZURE else ChatProvider.OPENAI,
-    reasoningEffort = reasoningEffort
-)
+fun AppSettings.toVoiceApiConfig(): VoiceApiConfig {
+    val profile = formatProfiles[formatProvider]
+    return VoiceApiConfig(
+        azureOpenAiBaseUrl = transcriptionEndpoint, azureOpenAiKey = transcriptionApiKey, transcriptionDeployment = transcriptionModel,
+        format = FormatApiConfig(formatProvider, profile.endpoint, profile.apiKey, profile.model, reasoningEffort),
+    )
+}
+
+/** Chat Completions の接続先と認証。プロバイダー分岐を純粋関数にしてテスト可能にする。 */
+internal data class ChatRequestRoute(val url: String, val headers: Map<String, String>)
+
+internal fun chatRequestRoute(config: FormatApiConfig): ChatRequestRoute = when (config.provider) {
+    FormatProvider.AZURE -> ChatRequestRoute(
+        url = AzureEndpoints.azureChat(config.endpoint),
+        headers = mapOf("api-key" to config.apiKey),
+    )
+    FormatProvider.OPENAI -> ChatRequestRoute(
+        url = OPENAI_CHAT_URL,
+        headers = mapOf("Authorization" to "Bearer ${config.apiKey}"),
+    )
+    FormatProvider.GEMINI -> ChatRequestRoute(
+        url = GEMINI_CHAT_URL,
+        headers = mapOf("Authorization" to "Bearer ${config.apiKey}"),
+    )
+}
+
+private const val OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
+private const val GEMINI_CHAT_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 
 open class VoiceApiException(message: String, cause: Throwable? = null, val status: Int? = null) : Exception(message, cause)
 class VoiceApiCancelledException : VoiceApiException("Cancelled")
@@ -62,14 +89,13 @@ class VoiceApiClient(private val config: VoiceApiConfig, private val onTrace: ((
         val messages = listOf(ChatMessage("system", prompt), ChatMessage("user", source))
         val startMs = System.currentTimeMillis()
         try {
-            val payload = JSONObject().put("model", config.chatDeployment).put("messages", messages.toJson())
-            if (config.reasoningEffort.isNotBlank()) payload.put("reasoning_effort", config.reasoningEffort)
+            val payload = JSONObject().put("model", config.format.model).put("messages", messages.toJson())
+            if (config.format.reasoningEffort.isNotBlank()) payload.put("reasoning_effort", config.format.reasoningEffort)
             // 完成した 1 応答だけを返す。試行をまたぐ可変状態を作らないので、
             // リトライしても前の試行のモデル名やトークン数が混ざらない。
             val completion = withRetry {
-                val (url, headers) = if (config.chatProvider == ChatProvider.AZURE) AzureEndpoints.azureChat(config.chatBaseUrl) to mapOf("api-key" to config.chatApiKey)
-                else AzureEndpoints.openAiChat() to mapOf("Authorization" to "Bearer ${config.chatApiKey}")
-                JSONObject(request(url, headers + mapOf("Content-Type" to "application/json")) { it.write(payload.toString().toByteArray()) })
+                val route = chatRequestRoute(config.format)
+                JSONObject(request(route.url, route.headers + mapOf("Content-Type" to "application/json")) { it.write(payload.toString().toByteArray()) })
                     .toChatCompletion()
                     .also { if (it.text.isBlank()) throw RetryableException("Empty format response") }
             }
@@ -104,12 +130,12 @@ class VoiceApiClient(private val config: VoiceApiConfig, private val onTrace: ((
         sink(
             LlmSpan(
                 spanName = spanName,
-                provider = config.chatProvider,
-                requestModel = config.chatDeployment,
+                provider = config.format.provider,
+                requestModel = config.format.model,
                 responseModel = completion?.model,
                 messages = messages,
                 completion = completion?.text,
-                reasoningEffort = config.reasoningEffort,
+                reasoningEffort = config.format.reasoningEffort,
                 inputTokens = completion?.inputTokens,
                 outputTokens = completion?.outputTokens,
                 startTimeMs = startMs,

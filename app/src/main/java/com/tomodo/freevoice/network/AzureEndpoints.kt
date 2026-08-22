@@ -27,8 +27,6 @@ object AzureEndpoints {
     /** Azure's current v1 chat endpoint uses the model in JSON, not in the path. */
     fun azureChat(baseUrl: String): String = "${normalizeOpenAiEndpoint(baseUrl)}/openai/v1/chat/completions"
 
-    fun openAiChat(): String = "https://api.openai.com/v1/chat/completions"
-
     private fun String.pathEncode() = URLEncoder.encode(this, "UTF-8").replace("+", "%20")
     private fun String.queryEncode() = URLEncoder.encode(this, "UTF-8")
 }
