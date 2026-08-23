@@ -137,6 +137,7 @@ jobs:
           VERSION_NAME: ${{ needs.build.outputs.version_name }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
             "dist/FreeVoice-$VERSION_NAME.apk" \
             "dist/FreeVoice-$VERSION_NAME.apk.sha256" \
             --title "Release $GITHUB_REF_NAME" \
