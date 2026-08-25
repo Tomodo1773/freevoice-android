@@ -13,16 +13,12 @@ updates:
       semver-minor-days: 7
       semver-patch-days: 7
     groups:
-      # version-updatesを1つのPRにグループ化
-      gradle-version:
+      # 互換性を一緒に確認するビルドツールだけをグループ化する。
+      gradle-toolchain:
         applies-to: version-updates
         patterns:
-          - "*"
-      # security-updatesを1つのPRにグループ化
-      gradle-security:
-        applies-to: security-updates
-        patterns:
-          - "*"
+          - "com.android.application"
+          - "gradle-wrapper"
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
