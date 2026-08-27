@@ -63,13 +63,14 @@ internal class SettingsVoiceGateway(
     @Volatile private var activeSettings: AppSettings? = null
 
     /**
-     * Builds the session for one recording, and is the only place that knows the two
+     * Builds the session for one recording, and is the only place that knows the three
      * transcription providers differ.  Settings are read here so a change made
      * mid-recording cannot alter the job that is already running.
      */
     fun createSession(): VoiceInputController.VoiceSession {
         val current = settings.load()
         activeSettings = current
+        val transcription = current.transcriptionProfiles[current.transcriptionProvider]
         val activeClient = VoiceApiClient(current.toVoiceApiConfig(), tracer.sinkFor(current))
         client = activeClient
         return when (current.transcriptionProvider) {
@@ -80,8 +81,16 @@ internal class SettingsVoiceGateway(
                 onStopSignal = onStopSignal,
             )
             TranscriptionProvider.AZURE_SPEECH -> StreamingVoiceSession(
-                endpoint = current.speechEndpoint,
-                apiKey = current.transcriptionApiKey,
+                endpoint = transcription.endpoint,
+                apiKey = transcription.apiKey,
+                language = current.speechLanguage,
+                diagnostics = diagnostics,
+                onInterim = onInterim,
+                onStopSignal = onStopSignal,
+            )
+            TranscriptionProvider.GEMINI_LIVE -> GeminiLiveVoiceSession(
+                apiKey = transcription.apiKey,
+                model = transcription.model,
                 language = current.speechLanguage,
                 diagnostics = diagnostics,
                 onInterim = onInterim,

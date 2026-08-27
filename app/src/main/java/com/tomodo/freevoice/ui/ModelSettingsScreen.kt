@@ -5,11 +5,13 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
+import com.tomodo.freevoice.R
+import com.tomodo.freevoice.data.ApiProfile
 import com.tomodo.freevoice.data.AppSettings
-import com.tomodo.freevoice.data.FormatProfile
 import com.tomodo.freevoice.data.FormatProfiles
 import com.tomodo.freevoice.data.FormatProvider
 import com.tomodo.freevoice.data.LangsmithRegion
+import com.tomodo.freevoice.data.TranscriptionProfiles
 import com.tomodo.freevoice.data.TranscriptionProvider
 import com.tomodo.freevoice.databinding.ScreenModelSettingsBinding
 import com.tomodo.freevoice.settingsFieldVisibility
@@ -19,32 +21,35 @@ internal class ModelSettingsScreen(
     val binding: ScreenModelSettingsBinding,
     onSave: () -> Unit,
 ) {
+    private var shownTranscriptionProvider = TranscriptionProvider.AZURE_OPENAI
+    private var transcriptionProfiles = TranscriptionProfiles()
     private var shownFormatProvider = FormatProvider.AZURE
     private var formatProfiles = FormatProfiles()
 
     init {
-        binding.modelTranscriptionProvider.adapter = adapter(arrayOf("Azure OpenAI", "Azure Speech"))
+        binding.modelTranscriptionProvider.adapter = adapter(TRANSCRIPTION_PROVIDERS.map { it.second }.toTypedArray())
         binding.modelFormatProvider.adapter = adapter(FORMAT_PROVIDERS.map { it.second }.toTypedArray())
         binding.modelReasoningEffort.adapter = adapter(REASONING_EFFORTS)
         binding.modelLangsmithRegion.adapter = adapter(LangsmithRegion.entries.map { it.name }.toTypedArray())
         binding.modelLangsmithEnabled.setOnCheckedChangeListener { _, _ -> renderVisibility() }
-        binding.modelTranscriptionProvider.onSelectionChanged(::renderVisibility)
+        binding.modelTranscriptionProvider.onSelectionChanged(::onTranscriptionProviderSelected)
         binding.modelFormatProvider.onSelectionChanged(::onFormatProviderSelected)
         binding.modelFormatEnabled.setOnCheckedChangeListener { _, _ -> renderVisibility() }
         binding.modelSaveButton.setOnClickListener { onSave() }
     }
 
     fun bind(settings: AppSettings) {
+        transcriptionProfiles = settings.transcriptionProfiles
+        shownTranscriptionProvider = settings.transcriptionProvider
+        showTranscriptionProfile(transcriptionProfiles[shownTranscriptionProvider])
+        binding.modelTranscriptionProvider.setSelection(
+            TRANSCRIPTION_PROVIDERS.indexOfFirst { it.first == settings.transcriptionProvider },
+        )
+        binding.modelSpeechLanguage.setText(settings.speechLanguage)
         formatProfiles = settings.formatProfiles
         shownFormatProvider = settings.formatProvider
-        binding.modelTranscriptionProvider.setSelection(settings.transcriptionProvider.ordinal)
-        binding.modelTranscriptionEndpoint.setText(settings.transcriptionEndpoint)
-        binding.modelTranscriptionApiKey.setText(settings.transcriptionApiKey)
-        binding.modelTranscriptionModel.setText(settings.transcriptionModel)
-        binding.modelSpeechEndpoint.setText(settings.speechEndpoint)
-        binding.modelSpeechLanguage.setText(settings.speechLanguage)
-        binding.modelFormatEnabled.isChecked = settings.formatEnabled
         showFormatProfile(formatProfiles[shownFormatProvider])
+        binding.modelFormatEnabled.isChecked = settings.formatEnabled
         binding.modelFormatProvider.setSelection(FORMAT_PROVIDERS.indexOfFirst { it.first == settings.formatProvider })
         binding.modelReasoningEffort.setSelection(
             REASONING_EFFORTS.indexOf(settings.reasoningEffort)
@@ -61,15 +66,11 @@ internal class ModelSettingsScreen(
     }
 
     fun collect(base: AppSettings): AppSettings {
+        transcriptionProfiles = transcriptionProfiles.replacing(shownTranscriptionProvider, readTranscriptionProfile())
         formatProfiles = formatProfiles.replacing(shownFormatProvider, readFormatProfile())
         return base.copy(
-            transcriptionProvider = TranscriptionProvider.entries.getOrElse(
-                binding.modelTranscriptionProvider.selectedItemPosition,
-            ) { TranscriptionProvider.AZURE_OPENAI },
-            transcriptionEndpoint = binding.modelTranscriptionEndpoint.text.toString(),
-            transcriptionApiKey = binding.modelTranscriptionApiKey.text.toString(),
-            transcriptionModel = binding.modelTranscriptionModel.text.toString(),
-            speechEndpoint = binding.modelSpeechEndpoint.text.toString(),
+            transcriptionProvider = shownTranscriptionProvider,
+            transcriptionProfiles = transcriptionProfiles,
             speechLanguage = binding.modelSpeechLanguage.text.toString(),
             formatEnabled = binding.modelFormatEnabled.isChecked,
             formatProvider = shownFormatProvider,
@@ -91,6 +92,19 @@ internal class ModelSettingsScreen(
         binding.modelSaveStatus.text = message
     }
 
+    /** 表示中のプロバイダーの入力を退避してから差し替える。キーが混ざらない唯一の順序。 */
+    private fun onTranscriptionProviderSelected() {
+        val nextProvider = TRANSCRIPTION_PROVIDERS.getOrElse(
+            binding.modelTranscriptionProvider.selectedItemPosition,
+        ) { TRANSCRIPTION_PROVIDERS.first() }.first
+        if (shownTranscriptionProvider != nextProvider) {
+            transcriptionProfiles = transcriptionProfiles.replacing(shownTranscriptionProvider, readTranscriptionProfile())
+            shownTranscriptionProvider = nextProvider
+            showTranscriptionProfile(transcriptionProfiles[shownTranscriptionProvider])
+        }
+        renderVisibility()
+    }
+
     private fun onFormatProviderSelected() {
         val nextProvider = FORMAT_PROVIDERS.getOrElse(
             binding.modelFormatProvider.selectedItemPosition,
@@ -103,30 +117,50 @@ internal class ModelSettingsScreen(
         renderVisibility()
     }
 
-    private fun readFormatProfile() = FormatProfile(
+    private fun readTranscriptionProfile() = ApiProfile(
+        endpoint = binding.modelTranscriptionEndpoint.text.toString(),
+        apiKey = binding.modelTranscriptionApiKey.text.toString(),
+        model = binding.modelTranscriptionModel.text.toString(),
+    )
+
+    private fun showTranscriptionProfile(profile: ApiProfile) {
+        binding.modelTranscriptionEndpoint.setText(profile.endpoint)
+        binding.modelTranscriptionApiKey.setText(profile.apiKey)
+        binding.modelTranscriptionModel.setText(profile.model)
+    }
+
+    private fun readFormatProfile() = ApiProfile(
         endpoint = binding.modelFormatEndpoint.text.toString(),
         apiKey = binding.modelFormatApiKey.text.toString(),
         model = binding.modelFormatModel.text.toString(),
     )
 
-    private fun showFormatProfile(profile: FormatProfile) {
+    private fun showFormatProfile(profile: ApiProfile) {
         binding.modelFormatEndpoint.setText(profile.endpoint)
         binding.modelFormatApiKey.setText(profile.apiKey)
         binding.modelFormatModel.setText(profile.model)
     }
 
     private fun renderVisibility() {
-        val transcription = TranscriptionProvider.entries.getOrElse(
-            binding.modelTranscriptionProvider.selectedItemPosition,
-        ) { TranscriptionProvider.AZURE_OPENAI }
-        val fields = settingsFieldVisibility(transcription, shownFormatProvider)
+        val fields = settingsFieldVisibility(shownTranscriptionProvider, shownFormatProvider)
         binding.modelTranscriptionEndpointRow.isVisible = fields.transcriptionEndpoint
         binding.modelTranscriptionModelRow.isVisible = fields.transcriptionModel
-        binding.modelSpeechEndpointRow.isVisible = fields.speechEndpoint
         binding.modelSpeechLanguageRow.isVisible = fields.speechLanguage
+        if (fields.transcriptionEndpoint) showEndpointLabels(shownTranscriptionProvider)
         binding.modelFormatFields.isVisible = binding.modelFormatEnabled.isChecked
         binding.modelFormatEndpointRow.isVisible = fields.formatEndpoint
         binding.modelLangsmithFields.isVisible = binding.modelLangsmithEnabled.isChecked
+    }
+
+    /** 入力欄は1つだが、宛先はプロバイダーで違う。見出しと例をそれに合わせる。 */
+    private fun showEndpointLabels(provider: TranscriptionProvider) {
+        val speech = provider == TranscriptionProvider.AZURE_SPEECH
+        binding.modelTranscriptionEndpointLabel.setText(
+            if (speech) R.string.speech_endpoint else R.string.transcription_endpoint,
+        )
+        binding.modelTranscriptionEndpointExample.setText(
+            if (speech) R.string.speech_endpoint_example else R.string.azure_openai_endpoint_example,
+        )
     }
 
     private fun adapter(items: Array<String>) =
@@ -154,6 +188,11 @@ internal class ModelSettingsScreen(
         }
 
     companion object {
+        private val TRANSCRIPTION_PROVIDERS = listOf(
+            TranscriptionProvider.AZURE_OPENAI to "Azure OpenAI",
+            TranscriptionProvider.AZURE_SPEECH to "Azure Speech",
+            TranscriptionProvider.GEMINI_LIVE to "Gemini Live",
+        )
         private val FORMAT_PROVIDERS = listOf(
             FormatProvider.AZURE to "Azure OpenAI",
             FormatProvider.OPENAI to "OpenAI",

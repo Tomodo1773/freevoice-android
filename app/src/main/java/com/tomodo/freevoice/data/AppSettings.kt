@@ -1,14 +1,10 @@
 package com.tomodo.freevoice.data
 
-enum class TranscriptionProvider { AZURE_OPENAI, AZURE_SPEECH }
 enum class LangsmithRegion { US, EU }
 
 data class AppSettings(
     val transcriptionProvider: TranscriptionProvider = TranscriptionProvider.AZURE_OPENAI,
-    val transcriptionEndpoint: String = "",
-    val transcriptionApiKey: String = "",
-    val transcriptionModel: String = "gpt-4o-transcribe",
-    val speechEndpoint: String = "",
+    val transcriptionProfiles: TranscriptionProfiles = TranscriptionProfiles(),
     val speechLanguage: String = "ja-JP",
     val formatEnabled: Boolean = true,
     val formatProvider: FormatProvider = FormatProvider.AZURE,
@@ -24,17 +20,24 @@ data class AppSettings(
 ) {
     /** null のとき、その設定で音声入力を開始できる。トレーシングは任意なので検証しない。 */
     fun validateForVoiceInput(): String? {
-        if (transcriptionApiKey.isBlank()) return "文字起こし API キーを入力して"
+        val transcription = transcriptionProfiles[transcriptionProvider]
+        if (transcription.apiKey.isBlank()) return "文字起こし API キーを入力して"
         val transcriptionError = when (transcriptionProvider) {
             TranscriptionProvider.AZURE_OPENAI -> when {
-                transcriptionEndpoint.isBlank() -> "Azure OpenAI のエンドポイントを入力して"
-                transcriptionModel.isBlank() -> "文字起こしモデルを入力して"
-                else -> validateUrl(transcriptionEndpoint, "文字起こしエンドポイント")
+                transcription.endpoint.isBlank() -> "Azure OpenAI のエンドポイントを入力して"
+                transcription.model.isBlank() -> "文字起こしモデルを入力して"
+                else -> validateUrl(transcription.endpoint, "文字起こしエンドポイント")
             }
             TranscriptionProvider.AZURE_SPEECH -> when {
-                speechEndpoint.isBlank() -> "Azure Speech のエンドポイントを入力して"
+                transcription.endpoint.isBlank() -> "Azure Speech のエンドポイントを入力して"
                 speechLanguage.isBlank() -> "音声言語を入力して"
-                else -> validateUrl(speechEndpoint, "Azure Speech エンドポイント")
+                else -> validateUrl(transcription.endpoint, "Azure Speech エンドポイント")
+            }
+            // 接続先は Live API の定数なので、確かめるのはモデルと言語だけ。
+            TranscriptionProvider.GEMINI_LIVE -> when {
+                transcription.model.isBlank() -> "文字起こしモデルを入力して"
+                speechLanguage.isBlank() -> "音声言語を入力して"
+                else -> null
             }
         }
         if (transcriptionError != null) return transcriptionError

@@ -7,16 +7,27 @@ import org.junit.Test
 
 class AppSettingsTest {
     private fun valid() = AppSettings(
-        transcriptionApiKey = "key",
-        transcriptionEndpoint = "https://transcribe",
+        transcriptionProfiles = TranscriptionProfiles(
+            azureOpenAi = ApiProfile("https://transcribe", "key", DEFAULT_AZURE_OPENAI_TRANSCRIBE_MODEL),
+            azureSpeech = ApiProfile("https://speech", "speech-key", ""),
+            geminiLive = ApiProfile(apiKey = "gemini-key", model = DEFAULT_GEMINI_TRANSCRIBE_MODEL),
+        ),
         formatProfiles = FormatProfiles(
-            azure = FormatProfile("https://format", "azure-key", DEFAULT_OPENAI_FORMAT_MODEL),
-            openAi = FormatProfile(apiKey = "openai-key", model = DEFAULT_OPENAI_FORMAT_MODEL),
-            gemini = FormatProfile(apiKey = "gemini-key", model = DEFAULT_GEMINI_FORMAT_MODEL),
+            azure = ApiProfile("https://format", "azure-key", DEFAULT_OPENAI_FORMAT_MODEL),
+            openAi = ApiProfile(apiKey = "openai-key", model = DEFAULT_OPENAI_FORMAT_MODEL),
+            gemini = ApiProfile(apiKey = "gemini-key", model = DEFAULT_GEMINI_FORMAT_MODEL),
         ),
     )
 
-    private fun AppSettings.withFormat(provider: FormatProvider, update: (FormatProfile) -> FormatProfile) =
+    private fun AppSettings.withTranscription(
+        provider: TranscriptionProvider,
+        update: (ApiProfile) -> ApiProfile,
+    ) = copy(
+        transcriptionProvider = provider,
+        transcriptionProfiles = transcriptionProfiles.replacing(provider, update(transcriptionProfiles[provider])),
+    )
+
+    private fun AppSettings.withFormat(provider: FormatProvider, update: (ApiProfile) -> ApiProfile) =
         copy(formatProfiles = formatProfiles.replacing(provider, update(formatProfiles[provider])))
 
     @Test fun `format defaults use terra with low reasoning`() {
@@ -25,13 +36,49 @@ class AppSettingsTest {
         assertEquals("low", settings.reasoningEffort)
     }
     @Test fun `azure openai requires endpoint and model`() {
-        assertEquals("Azure OpenAI のエンドポイントを入力して", valid().copy(transcriptionEndpoint = "").validateForVoiceInput())
-        assertEquals("文字起こしモデルを入力して", valid().copy(transcriptionModel = "").validateForVoiceInput())
+        val azure = TranscriptionProvider.AZURE_OPENAI
+        assertEquals(
+            "Azure OpenAI のエンドポイントを入力して",
+            valid().withTranscription(azure) { it.copy(endpoint = "") }.validateForVoiceInput(),
+        )
+        assertEquals(
+            "文字起こしモデルを入力して",
+            valid().withTranscription(azure) { it.copy(model = "") }.validateForVoiceInput(),
+        )
     }
     @Test fun `speech requires its endpoint and language`() {
         val speech = valid().copy(transcriptionProvider = TranscriptionProvider.AZURE_SPEECH)
-        assertEquals("Azure Speech のエンドポイントを入力して", speech.copy(speechEndpoint = "").validateForVoiceInput())
-        assertEquals("音声言語を入力して", speech.copy(speechEndpoint = "https://speech", speechLanguage = "").validateForVoiceInput())
+        assertNull(speech.validateForVoiceInput())
+        assertEquals(
+            "Azure Speech のエンドポイントを入力して",
+            speech.withTranscription(TranscriptionProvider.AZURE_SPEECH) { it.copy(endpoint = "") }.validateForVoiceInput(),
+        )
+        assertEquals("音声言語を入力して", speech.copy(speechLanguage = "").validateForVoiceInput())
+    }
+
+    /** プロバイダーごとにキーを分けた意味は、選んでいない側の空キーで止められないこと。 */
+    @Test fun `each provider is validated with its own key`() {
+        val onlyGemini = AppSettings(
+            transcriptionProvider = TranscriptionProvider.GEMINI_LIVE,
+            transcriptionProfiles = TranscriptionProfiles(
+                geminiLive = ApiProfile(apiKey = "gemini-key", model = DEFAULT_GEMINI_TRANSCRIBE_MODEL),
+            ),
+            formatEnabled = false,
+        )
+        assertNull(onlyGemini.validateForVoiceInput())
+        assertEquals(
+            "文字起こし API キーを入力して",
+            onlyGemini.copy(transcriptionProvider = TranscriptionProvider.AZURE_OPENAI).validateForVoiceInput(),
+        )
+    }
+    @Test fun `gemini live requires model and language but has no endpoint`() {
+        val live = valid().copy(transcriptionProvider = TranscriptionProvider.GEMINI_LIVE)
+        assertNull(live.validateForVoiceInput())
+        assertEquals(
+            "文字起こしモデルを入力して",
+            live.withTranscription(TranscriptionProvider.GEMINI_LIVE) { it.copy(model = "") }.validateForVoiceInput(),
+        )
+        assertEquals("音声言語を入力して", live.copy(speechLanguage = "").validateForVoiceInput())
     }
     @Test fun `langsmith is opt-in and never blocks voice input`() {
         assertEquals(false, AppSettings().langsmithEnabled)

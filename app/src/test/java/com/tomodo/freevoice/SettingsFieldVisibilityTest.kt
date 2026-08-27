@@ -6,12 +6,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SettingsFieldVisibilityTest {
-    @Test fun `azure openai transcription hides speech fields`() {
+    @Test fun `azure openai takes an endpoint and a model, not a language`() {
         assertEquals(
             SettingsFieldVisibility(
                 transcriptionEndpoint = true,
                 transcriptionModel = true,
-                speechEndpoint = false,
                 speechLanguage = false,
                 formatEndpoint = true,
             ),
@@ -19,16 +18,28 @@ class SettingsFieldVisibilityTest {
         )
     }
 
-    @Test fun `azure speech hides openai transcription fields`() {
+    @Test fun `azure speech takes an endpoint and a language, not a model`() {
         assertEquals(
             SettingsFieldVisibility(
-                transcriptionEndpoint = false,
+                transcriptionEndpoint = true,
                 transcriptionModel = false,
-                speechEndpoint = true,
                 speechLanguage = true,
                 formatEndpoint = true,
             ),
             settingsFieldVisibility(TranscriptionProvider.AZURE_SPEECH, FormatProvider.AZURE),
+        )
+    }
+
+    /** Live API の接続先は定数なので、エンドポイントは入力させない。 */
+    @Test fun `gemini live takes a model and a language, not an endpoint`() {
+        assertEquals(
+            SettingsFieldVisibility(
+                transcriptionEndpoint = false,
+                transcriptionModel = true,
+                speechLanguage = true,
+                formatEndpoint = true,
+            ),
+            settingsFieldVisibility(TranscriptionProvider.GEMINI_LIVE, FormatProvider.AZURE),
         )
     }
 

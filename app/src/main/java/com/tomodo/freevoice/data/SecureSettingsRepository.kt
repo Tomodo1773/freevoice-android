@@ -17,12 +17,10 @@ class SecureSettingsRepository(context: Context) {
 
     fun load(): AppSettings {
         val formatProvider = enum(P_FORMAT_PROVIDER, FormatProvider.AZURE)
+        val transcriptionProvider = enum(P_TRANSCRIPTION_PROVIDER, TranscriptionProvider.AZURE_OPENAI)
         return AppSettings(
-            transcriptionProvider = enum(P_TRANSCRIPTION_PROVIDER, TranscriptionProvider.AZURE_OPENAI),
-            transcriptionEndpoint = plain(P_TRANSCRIPTION_ENDPOINT),
-            transcriptionApiKey = secret(P_TRANSCRIPTION_API_KEY),
-            transcriptionModel = plain(P_TRANSCRIPTION_MODEL, "gpt-4o-transcribe"),
-            speechEndpoint = plain(P_SPEECH_ENDPOINT),
+            transcriptionProvider = transcriptionProvider,
+            transcriptionProfiles = loadTranscriptionProfiles(transcriptionProvider),
             speechLanguage = plain(P_SPEECH_LANGUAGE, "ja-JP"),
             formatEnabled = preferences.getBoolean(P_FORMAT_ENABLED, true),
             formatProvider = formatProvider,
@@ -40,12 +38,14 @@ class SecureSettingsRepository(context: Context) {
 
     fun save(settings: AppSettings) {
         val profiles = settings.formatProfiles
+        val transcription = settings.transcriptionProfiles
         preferences.edit()
             .putString(P_TRANSCRIPTION_PROVIDER, settings.transcriptionProvider.name)
-            .putString(P_TRANSCRIPTION_ENDPOINT, settings.transcriptionEndpoint.trim())
-            .putString(P_TRANSCRIPTION_MODEL, settings.transcriptionModel.trim())
-            .putString(P_SPEECH_ENDPOINT, settings.speechEndpoint.trim())
             .putString(P_SPEECH_LANGUAGE, settings.speechLanguage.trim())
+            .putString(P_TRANSCRIPTION_AZURE_OPENAI_ENDPOINT, transcription.azureOpenAi.endpoint.trim())
+            .putString(P_TRANSCRIPTION_AZURE_OPENAI_MODEL, transcription.azureOpenAi.model.trim())
+            .putString(P_TRANSCRIPTION_AZURE_SPEECH_ENDPOINT, transcription.azureSpeech.endpoint.trim())
+            .putString(P_TRANSCRIPTION_GEMINI_MODEL, transcription.geminiLive.model.trim())
             .putBoolean(P_FORMAT_ENABLED, settings.formatEnabled)
             .putString(P_FORMAT_PROVIDER, settings.formatProvider.name)
             .putString(P_FORMAT_AZURE_ENDPOINT, profiles.azure.endpoint.trim())
@@ -59,7 +59,9 @@ class SecureSettingsRepository(context: Context) {
             .putString(P_LANGSMITH_PROJECT, settings.langsmithProject.trim())
             .putString(P_LANGSMITH_REGION, settings.langsmithRegion.name)
             .putBoolean(P_LANGSMITH_INCLUDE_CONTENT, settings.langsmithIncludeContent)
-            .putString(P_TRANSCRIPTION_API_KEY, encrypt(settings.transcriptionApiKey))
+            .putString(P_TRANSCRIPTION_AZURE_OPENAI_API_KEY, encrypt(transcription.azureOpenAi.apiKey))
+            .putString(P_TRANSCRIPTION_AZURE_SPEECH_API_KEY, encrypt(transcription.azureSpeech.apiKey))
+            .putString(P_TRANSCRIPTION_GEMINI_API_KEY, encrypt(transcription.geminiLive.apiKey))
             .putString(P_FORMAT_AZURE_API_KEY, encrypt(profiles.azure.apiKey))
             .putString(P_FORMAT_OPENAI_API_KEY, encrypt(profiles.openAi.apiKey))
             .putString(P_FORMAT_GEMINI_API_KEY, encrypt(profiles.gemini.apiKey))
@@ -67,7 +69,40 @@ class SecureSettingsRepository(context: Context) {
             .remove(P_FORMAT_ENDPOINT)
             .remove(P_FORMAT_API_KEY)
             .remove(P_FORMAT_MODEL)
+            .remove(P_TRANSCRIPTION_ENDPOINT)
+            .remove(P_TRANSCRIPTION_API_KEY)
+            .remove(P_TRANSCRIPTION_MODEL)
+            .remove(P_SPEECH_ENDPOINT)
             .apply()
+    }
+
+    /** 旧版の共有キーは、選択中だったプロバイダーの持ち物として引き継ぐ。 */
+    private fun loadTranscriptionProfiles(legacyProvider: TranscriptionProvider): TranscriptionProfiles {
+        if (!preferences.contains(P_TRANSCRIPTION_AZURE_OPENAI_MODEL)) {
+            return migrateLegacyTranscriptionProfiles(
+                provider = legacyProvider,
+                apiKey = secret(P_TRANSCRIPTION_API_KEY),
+                azureOpenAiEndpoint = plain(P_TRANSCRIPTION_ENDPOINT),
+                azureOpenAiModel = plain(P_TRANSCRIPTION_MODEL, DEFAULT_AZURE_OPENAI_TRANSCRIBE_MODEL),
+                azureSpeechEndpoint = plain(P_SPEECH_ENDPOINT),
+            )
+        }
+        return TranscriptionProfiles(
+            azureOpenAi = ApiProfile(
+                endpoint = plain(P_TRANSCRIPTION_AZURE_OPENAI_ENDPOINT),
+                apiKey = secret(P_TRANSCRIPTION_AZURE_OPENAI_API_KEY),
+                model = plain(P_TRANSCRIPTION_AZURE_OPENAI_MODEL, DEFAULT_AZURE_OPENAI_TRANSCRIBE_MODEL),
+            ),
+            azureSpeech = ApiProfile(
+                endpoint = plain(P_TRANSCRIPTION_AZURE_SPEECH_ENDPOINT),
+                apiKey = secret(P_TRANSCRIPTION_AZURE_SPEECH_API_KEY),
+                model = "",
+            ),
+            geminiLive = ApiProfile(
+                apiKey = secret(P_TRANSCRIPTION_GEMINI_API_KEY),
+                model = plain(P_TRANSCRIPTION_GEMINI_MODEL, DEFAULT_GEMINI_TRANSCRIBE_MODEL),
+            ),
+        )
     }
 
     private fun loadFormatProfiles(legacyProvider: FormatProvider): FormatProfiles {
@@ -75,7 +110,7 @@ class SecureSettingsRepository(context: Context) {
         if (!preferences.contains(P_FORMAT_AZURE_MODEL)) {
             return migrateLegacyFormatProfiles(
                 provider = legacyProvider,
-                profile = FormatProfile(
+                profile = ApiProfile(
                     endpoint = if (legacyProvider == FormatProvider.AZURE) plain(P_FORMAT_ENDPOINT) else "",
                     apiKey = secret(P_FORMAT_API_KEY),
                     model = plain(P_FORMAT_MODEL, defaults[legacyProvider].model),
@@ -83,16 +118,16 @@ class SecureSettingsRepository(context: Context) {
             )
         }
         return FormatProfiles(
-            azure = FormatProfile(
+            azure = ApiProfile(
                 endpoint = plain(P_FORMAT_AZURE_ENDPOINT),
                 apiKey = secret(P_FORMAT_AZURE_API_KEY),
                 model = plain(P_FORMAT_AZURE_MODEL, defaults.azure.model),
             ),
-            openAi = FormatProfile(
+            openAi = ApiProfile(
                 apiKey = secret(P_FORMAT_OPENAI_API_KEY),
                 model = plain(P_FORMAT_OPENAI_MODEL, defaults.openAi.model),
             ),
-            gemini = FormatProfile(
+            gemini = ApiProfile(
                 apiKey = secret(P_FORMAT_GEMINI_API_KEY),
                 model = plain(P_FORMAT_GEMINI_MODEL, defaults.gemini.model),
             ),
@@ -139,11 +174,19 @@ class SecureSettingsRepository(context: Context) {
         const val KEY_ALIAS = "freevoice_settings_aes_v1"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val P_TRANSCRIPTION_PROVIDER = "transcription_provider"
+        // 旧版の単一設定。新形式がなければ移行元として読む。
         const val P_TRANSCRIPTION_ENDPOINT = "transcription_endpoint"
         const val P_TRANSCRIPTION_API_KEY = "transcription_api_key"
         const val P_TRANSCRIPTION_MODEL = "transcription_model"
         const val P_SPEECH_ENDPOINT = "speech_endpoint"
         const val P_SPEECH_LANGUAGE = "speech_language"
+        const val P_TRANSCRIPTION_AZURE_OPENAI_ENDPOINT = "transcription_azure_openai_endpoint"
+        const val P_TRANSCRIPTION_AZURE_OPENAI_API_KEY = "transcription_azure_openai_api_key"
+        const val P_TRANSCRIPTION_AZURE_OPENAI_MODEL = "transcription_azure_openai_model"
+        const val P_TRANSCRIPTION_AZURE_SPEECH_ENDPOINT = "transcription_azure_speech_endpoint"
+        const val P_TRANSCRIPTION_AZURE_SPEECH_API_KEY = "transcription_azure_speech_api_key"
+        const val P_TRANSCRIPTION_GEMINI_API_KEY = "transcription_gemini_api_key"
+        const val P_TRANSCRIPTION_GEMINI_MODEL = "transcription_gemini_model"
         const val P_FORMAT_ENABLED = "format_enabled"
         const val P_FORMAT_PROVIDER = "format_provider"
         // 旧版の単一設定。新形式がなければ移行元として読む。

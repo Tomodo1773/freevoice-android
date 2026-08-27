@@ -2,6 +2,7 @@ package com.tomodo.freevoice.network
 
 import com.tomodo.freevoice.data.AppSettings
 import com.tomodo.freevoice.data.FormatProvider
+import com.tomodo.freevoice.data.TranscriptionProvider
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.DataOutputStream
@@ -26,8 +27,9 @@ data class VoiceApiConfig(
 // Azure Speech はここを通らない。Speech SDK が設定から直接ストリーミング接続する。
 fun AppSettings.toVoiceApiConfig(): VoiceApiConfig {
     val profile = formatProfiles[formatProvider]
+    val transcription = transcriptionProfiles[TranscriptionProvider.AZURE_OPENAI]
     return VoiceApiConfig(
-        azureOpenAiBaseUrl = transcriptionEndpoint, azureOpenAiKey = transcriptionApiKey, transcriptionDeployment = transcriptionModel,
+        azureOpenAiBaseUrl = transcription.endpoint, azureOpenAiKey = transcription.apiKey, transcriptionDeployment = transcription.model,
         format = FormatApiConfig(formatProvider, profile.endpoint, profile.apiKey, profile.model, reasoningEffort),
     )
 }

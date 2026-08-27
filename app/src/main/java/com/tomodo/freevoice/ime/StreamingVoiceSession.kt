@@ -6,7 +6,7 @@ import com.microsoft.cognitiveservices.speech.SpeechConfig
 import com.microsoft.cognitiveservices.speech.SpeechRecognitionCanceledEventArgs
 import com.microsoft.cognitiveservices.speech.SpeechRecognizer
 import com.microsoft.cognitiveservices.speech.audio.AudioConfig
-import com.tomodo.freevoice.audio.WavRecorder
+import com.tomodo.freevoice.audio.PcmRecorder
 import com.tomodo.freevoice.diag.DiagLogger
 import java.net.URI
 import java.util.concurrent.Executors
@@ -26,7 +26,7 @@ internal class StreamingVoiceSession(
     private val diagnostics: DiagLogger,
     private val onInterim: (String) -> Unit,
     private val onStopSignal: () -> Unit,
-    private val maxDurationMillis: Long = WavRecorder.MAX_DURATION_MS,
+    private val maxDurationMillis: Long = PcmRecorder.MAX_DURATION_MS,
 ) : VoiceInputController.VoiceSession {
     private class Native(
         val recognizer: SpeechRecognizer?,
@@ -74,25 +74,7 @@ internal class StreamingVoiceSession(
         }
         closeRecognizer()
 
-        val confirmed = transcript.confirmedText()
-        val interim = transcript.interimText()
-        val aborted = synchronized(lock) { abortMessage }
-        return when {
-            confirmed.isNotEmpty() -> {
-                if (aborted != null) {
-                    diagnostics.warn("speech", "salvaged ${confirmed.length} chars after abort")
-                }
-                confirmed
-            }
-            // stop と recognized 配信のあいだにはレースがあり、発話中に停止すると
-            // 確定が届かない端末がある。黙って空を返さず暫定を採用する。
-            interim.isNotEmpty() -> {
-                diagnostics.warn("speech", "interim fallback used (${interim.length} chars)")
-                interim
-            }
-            aborted != null -> throw UserVisibleException(aborted)
-            else -> ""
-        }
+        return transcript.resolve(synchronized(lock) { abortMessage }, diagnostics, "speech")
     }
 
     override fun cancel() {
