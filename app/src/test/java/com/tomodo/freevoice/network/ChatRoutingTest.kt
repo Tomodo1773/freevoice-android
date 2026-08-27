@@ -1,7 +1,7 @@
 package com.tomodo.freevoice.network
 
 import com.tomodo.freevoice.data.AppSettings
-import com.tomodo.freevoice.data.FormatProfile
+import com.tomodo.freevoice.data.ApiProfile
 import com.tomodo.freevoice.data.FormatProfiles
 import com.tomodo.freevoice.data.FormatProvider
 import org.junit.Assert.assertEquals
@@ -42,8 +42,8 @@ class ChatRoutingTest {
         val settings = AppSettings(
             formatProvider = FormatProvider.GEMINI,
             formatProfiles = FormatProfiles(
-                openAi = FormatProfile(apiKey = "openai-key", model = "openai-model"),
-                gemini = FormatProfile(apiKey = "gemini-key", model = "gemini-model"),
+                openAi = ApiProfile(apiKey = "openai-key", model = "openai-model"),
+                gemini = ApiProfile(apiKey = "gemini-key", model = "gemini-model"),
             ),
         )
 

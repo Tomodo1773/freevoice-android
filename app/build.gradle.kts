@@ -110,6 +110,9 @@ private fun Properties.required(key: String): String =
 dependencies {
     // Azure Speech の連続認識（WebSocket）。REST と違い発話中に認識が進む。
     implementation("com.microsoft.cognitiveservices.speech:client-sdk:1.51.1")
+    // Gemini Live API 用。Android SDK に WebSocket クライアントがない。
+    // 5.5.0 以降は compileSdk 37 を要求するので、36 で通る最後の版に留める。
+    implementation("com.squareup.okhttp3:okhttp:5.4.0")
 
     testImplementation("junit:junit:4.13.2")
     // android.jar の org.json はスタブなので、JVM テストでは実装を差す。

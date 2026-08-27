@@ -15,7 +15,7 @@ class FormatProfilesTest {
     @Test fun `replacing one provider preserves the others`() {
         val profiles = FormatProfiles().replacing(
             FormatProvider.OPENAI,
-            FormatProfile(apiKey = "openai-key", model = "openai-model"),
+            ApiProfile(apiKey = "openai-key", model = "openai-model"),
         )
 
         assertEquals("openai-key", profiles.openAi.apiKey)
@@ -26,11 +26,11 @@ class FormatProfilesTest {
     @Test fun `legacy profile migrates only to selected provider`() {
         val profiles = migrateLegacyFormatProfiles(
             FormatProvider.OPENAI,
-            FormatProfile(apiKey = "openai-key", model = "openai-custom"),
+            ApiProfile(apiKey = "openai-key", model = "openai-custom"),
         )
 
-        assertEquals(FormatProfile(apiKey = "openai-key", model = "openai-custom"), profiles.openAi)
-        assertEquals(FormatProfile(model = DEFAULT_GEMINI_FORMAT_MODEL), profiles.gemini)
-        assertEquals(FormatProfile(model = DEFAULT_OPENAI_FORMAT_MODEL), profiles.azure)
+        assertEquals(ApiProfile(apiKey = "openai-key", model = "openai-custom"), profiles.openAi)
+        assertEquals(ApiProfile(model = DEFAULT_GEMINI_FORMAT_MODEL), profiles.gemini)
+        assertEquals(ApiProfile(model = DEFAULT_OPENAI_FORMAT_MODEL), profiles.azure)
     }
 }
