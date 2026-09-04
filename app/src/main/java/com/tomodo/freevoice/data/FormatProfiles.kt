@@ -34,4 +34,4 @@ internal fun migrateLegacyFormatProfiles(
 ): FormatProfiles = FormatProfiles().replacing(provider, profile)
 
 const val DEFAULT_OPENAI_FORMAT_MODEL = "gpt-5.6-terra"
-const val DEFAULT_GEMINI_FORMAT_MODEL = "gemini-3.7-flash"
+const val DEFAULT_GEMINI_FORMAT_MODEL = "gemini-3.8-flash"
