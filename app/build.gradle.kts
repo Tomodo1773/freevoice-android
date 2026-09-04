@@ -116,5 +116,5 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     // android.jar の org.json はスタブなので、JVM テストでは実装を差す。
-    testImplementation("org.json:json:20260719")
+    testImplementation("org.json:json:20260814")
 }
