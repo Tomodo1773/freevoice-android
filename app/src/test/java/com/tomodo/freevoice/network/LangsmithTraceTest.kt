@@ -3,6 +3,7 @@ package com.tomodo.freevoice.network
 import com.tomodo.freevoice.data.AppSettings
 import com.tomodo.freevoice.data.FormatProvider
 import com.tomodo.freevoice.data.LangsmithRegion
+import com.tomodo.freevoice.data.TranscriptionProvider
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -39,14 +40,16 @@ class LangsmithTraceTest {
     }
 
     @Test
-    fun `sink stays null unless tracing is fully configured`() {
+    fun `config stays null unless tracing is fully configured`() {
         val configured = AppSettings(langsmithEnabled = true, langsmithApiKey = "ls-key")
         withTracer { tracer, _ ->
+            assertNotNull(tracer.configFor(configured))
             assertNotNull(tracer.sinkFor(configured))
             // 無効・キー未入力・プロジェクト未入力のいずれでも組み立てごと省く。
-            assertNull(tracer.sinkFor(configured.copy(langsmithEnabled = false)))
-            assertNull(tracer.sinkFor(configured.copy(langsmithApiKey = "")))
-            assertNull(tracer.sinkFor(configured.copy(langsmithProject = "")))
+            assertNull(tracer.configFor(configured.copy(langsmithEnabled = false)))
+            assertNull(tracer.configFor(configured.copy(langsmithApiKey = "")))
+            assertNull(tracer.configFor(configured.copy(langsmithProject = "")))
+            assertNull((null as LangsmithTracer?).configFor(configured))
             assertNull((null as LangsmithTracer?).sinkFor(configured))
         }
     }
@@ -55,8 +58,8 @@ class LangsmithTraceTest {
     fun `enabled but unconfigured tracing reports why nothing is sent`() {
         val configured = AppSettings(langsmithEnabled = true, langsmithApiKey = "ls-key")
         withTracer { tracer, failures ->
-            tracer.sinkFor(configured.copy(langsmithApiKey = ""))
-            tracer.sinkFor(configured.copy(langsmithProject = ""))
+            tracer.configFor(configured.copy(langsmithApiKey = ""))
+            tracer.configFor(configured.copy(langsmithProject = ""))
             assertEquals(2, failures.size)
             assertTrue(failures[0].contains("API キー"))
             assertTrue(failures[1].contains("プロジェクト名"))
@@ -66,7 +69,7 @@ class LangsmithTraceTest {
     @Test
     fun `disabled tracing stays silent`() {
         withTracer { tracer, failures ->
-            tracer.sinkFor(AppSettings(langsmithEnabled = false, langsmithApiKey = ""))
+            tracer.configFor(AppSettings(langsmithEnabled = false, langsmithApiKey = ""))
             assertTrue(failures.isEmpty())
         }
     }
@@ -104,12 +107,15 @@ class LangsmithTraceTest {
         assertEquals("aa", span.getString("traceId"))
         assertEquals("bb", span.getString("spanId"))
         assertEquals(3, span.getInt("kind"))
+        // 単発トレースの唯一のスパンは root なので親を持たない。
+        assertFalse(span.has("parentSpanId"))
         assertEquals("1000000000", span.getString("startTimeUnixNano"))
         assertEquals("1500000000", span.getString("endTimeUnixNano"))
         assertEquals(1, span.getJSONObject("status").getInt("code"))
         assertEquals(0, span.getJSONArray("events").length())
 
         val attributes = span.attributes()
+        assertEquals("llm", attributes.getValue("langsmith.span.kind"))
         assertEquals("azure.openai", attributes.getValue("gen_ai.system"))
         assertEquals("chat", attributes.getValue("gen_ai.operation.name"))
         assertEquals("gpt-5.6-terra", attributes.getValue("gen_ai.request.model"))
@@ -185,21 +191,17 @@ class LangsmithTraceTest {
     }
 
     @Test
-    fun `openai provider maps to openai system`() {
-        val attributes = buildLlmSpanPayload(
-            span().copy(provider = FormatProvider.OPENAI), "p", includeContent = false, traceId = "aa", spanId = "bb",
-        ).span().attributes()
-
-        assertEquals("openai", attributes.getValue("gen_ai.system"))
+    fun `format providers map to their gen ai system`() {
+        assertEquals("azure.openai", FormatProvider.AZURE.genAiSystem)
+        assertEquals("openai", FormatProvider.OPENAI.genAiSystem)
+        assertEquals("gcp.gemini", FormatProvider.GEMINI.genAiSystem)
     }
 
     @Test
-    fun `gemini provider maps to gcp gemini system`() {
-        val attributes = buildLlmSpanPayload(
-            span().copy(provider = FormatProvider.GEMINI), "p", includeContent = false, traceId = "aa", spanId = "bb",
-        ).span().attributes()
-
-        assertEquals("gcp.gemini", attributes.getValue("gen_ai.system"))
+    fun `transcription providers map to their gen ai system`() {
+        assertEquals("azure.openai", TranscriptionProvider.AZURE_OPENAI.genAiSystem)
+        assertEquals("azure.ai.speech", TranscriptionProvider.AZURE_SPEECH.genAiSystem)
+        assertEquals("gcp.gemini", TranscriptionProvider.GEMINI_LIVE.genAiSystem)
     }
 
     @Test
@@ -211,9 +213,76 @@ class LangsmithTraceTest {
         assertEquals("distill", attributes.getValue("freevoice.operation"))
     }
 
+    @Test
+    fun `recording payload puts the root and every child in one trace`() {
+        val spans = recording(includeContent = true).spans()
+
+        assertEquals(3, spans.length())
+        val root = spans.getJSONObject(0)
+        assertEquals("recording", root.getString("name"))
+        assertEquals(1, root.getInt("kind"))
+        assertFalse(root.has("parentSpanId"))
+        assertEquals("2000000000", root.getString("startTimeUnixNano"))
+        assertEquals("9000000000", root.getString("endTimeUnixNano"))
+        // 子は root と同じ traceId を持ち、parentSpanId に root の spanId を入れる。
+        listOf(1, 2).forEach { index ->
+            val child = spans.getJSONObject(index)
+            assertEquals("trace", child.getString("traceId"))
+            assertEquals("root", child.getString("parentSpanId"))
+            assertEquals("llm", child.attributes().getValue("langsmith.span.kind"))
+        }
+        assertEquals("transcribe", spans.getJSONObject(1).getString("name"))
+        assertEquals("child-0", spans.getJSONObject(1).getString("spanId"))
+        assertEquals("format", spans.getJSONObject(2).getString("name"))
+        assertEquals("child-1", spans.getJSONObject(2).getString("spanId"))
+    }
+
+    @Test
+    fun `root carries the chain kind with the raw and the inserted text`() {
+        val attributes = recording(includeContent = true).spans().getJSONObject(0).attributes()
+
+        assertEquals("chain", attributes.getValue("langsmith.span.kind"))
+        assertEquals("あー、てすと", attributes.getValue("input.value"))
+        assertEquals("テスト", attributes.getValue("output.value"))
+    }
+
+    @Test
+    fun `excluding content clears the root input and output too`() {
+        val spans = recording(includeContent = false).spans()
+
+        val root = spans.getJSONObject(0).attributes()
+        assertNull(root.getValue("input.value"))
+        assertNull(root.getValue("output.value"))
+        assertEquals("chain", root.getValue("langsmith.span.kind"))
+        assertNull(spans.getJSONObject(2).attributes().getValue("gen_ai.completion.0.content"))
+    }
+
+    private fun recording(includeContent: Boolean): JSONObject = buildRecordingPayload(
+        root = ChainSpan(input = "あー、てすと", output = "テスト", startTimeMs = 2_000L, endTimeMs = 9_000L),
+        children = listOf(
+            span().copy(
+                spanName = "transcribe",
+                system = "azure.ai.speech",
+                requestModel = "",
+                responseModel = null,
+                messages = listOf(ChatMessage("user", "audio_segment")),
+                completion = "あー、てすと",
+                reasoningEffort = "",
+                inputTokens = null,
+                outputTokens = null,
+            ),
+            span(),
+        ),
+        project = "freevoice",
+        includeContent = includeContent,
+        traceId = "trace",
+        rootSpanId = "root",
+        childSpanIds = listOf("child-0", "child-1"),
+    )
+
     private fun span() = LlmSpan(
         spanName = "format",
-        provider = FormatProvider.AZURE,
+        system = "azure.openai",
         requestModel = "gpt-5.6-terra",
         responseModel = "gpt-5.6-terra-2026",
         messages = listOf(ChatMessage("system", "校正して"), ChatMessage("user", "<校正対象>あー、てすと</校正対象>")),
@@ -225,9 +294,11 @@ class LangsmithTraceTest {
         endTimeMs = 1_500L,
     )
 
-    private fun JSONObject.span(): JSONObject = getJSONArray("resourceSpans").getJSONObject(0)
+    private fun JSONObject.spans(): JSONArray = getJSONArray("resourceSpans").getJSONObject(0)
         .getJSONArray("scopeSpans").getJSONObject(0)
-        .getJSONArray("spans").getJSONObject(0)
+        .getJSONArray("spans")
+
+    private fun JSONObject.span(): JSONObject = spans().getJSONObject(0)
 
     private fun JSONObject.attributes(): JSONArray = getJSONArray("attributes")
 

@@ -3,6 +3,7 @@ package com.tomodo.freevoice.network
 import com.tomodo.freevoice.data.AppSettings
 import com.tomodo.freevoice.data.FormatProvider
 import com.tomodo.freevoice.data.LangsmithRegion
+import com.tomodo.freevoice.data.TranscriptionProvider
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -45,7 +46,8 @@ data class ChatMessage(val role: String, val content: String)
 /** LLM 呼び出し 1 回分。時刻は System.currentTimeMillis() を想定する。 */
 data class LlmSpan(
     val spanName: String,
-    val provider: FormatProvider,
+    /** gen_ai.system の値。文字起こしと整形でプロバイダーの型が違うので文字列で持つ。 */
+    val system: String,
     val requestModel: String,
     val responseModel: String? = null,
     val messages: List<ChatMessage> = emptyList(),
@@ -59,8 +61,30 @@ data class LlmSpan(
     val errorStatus: Int? = null,
 )
 
+/** 録音 1 回ぶんの親スパン。子の LLM 呼び出しをまとめる。 */
+data class ChainSpan(
+    /** 文字起こしの生テキスト。 */
+    val input: String,
+    /** 実際に入力したテキスト。 */
+    val output: String,
+    val startTimeMs: Long,
+    val endTimeMs: Long,
+)
+
+val FormatProvider.genAiSystem: String get() = when (this) {
+    FormatProvider.AZURE -> "azure.openai"
+    FormatProvider.OPENAI -> "openai"
+    FormatProvider.GEMINI -> "gcp.gemini"
+}
+
+val TranscriptionProvider.genAiSystem: String get() = when (this) {
+    TranscriptionProvider.AZURE_OPENAI -> "azure.openai"
+    TranscriptionProvider.AZURE_SPEECH -> "azure.ai.speech"
+    TranscriptionProvider.GEMINI_LIVE -> "gcp.gemini"
+}
+
 /**
- * 1 回の LLM 呼び出しを OTLP/HTTP JSON の resourceSpans 形式へ組み立てる。
+ * 1 回の LLM 呼び出しだけで完結するトレース。話題蒸留のように録音の外で走るものが使う。
  * OpenLLMetry の gen_ai.* semantic convention に準拠。
  */
 fun buildLlmSpanPayload(
@@ -69,13 +93,38 @@ fun buildLlmSpanPayload(
     includeContent: Boolean,
     traceId: String,
     spanId: String,
+): JSONObject = tracePayload(project, JSONArray().put(llmSpanJson(span, includeContent, traceId, spanId, null)))
+
+/**
+ * 録音 1 回ぶん。root と子を 1 リクエストにまとめる。
+ * LangSmith は親が結局送られてこない子スパンを破棄するので、分割して送らない。
+ */
+fun buildRecordingPayload(
+    root: ChainSpan,
+    children: List<LlmSpan>,
+    project: String,
+    includeContent: Boolean,
+    traceId: String,
+    rootSpanId: String,
+    childSpanIds: List<String>,
+): JSONObject {
+    val spans = JSONArray().put(chainSpanJson(root, includeContent, traceId, rootSpanId))
+    children.zip(childSpanIds).forEach { (child, spanId) ->
+        spans.put(llmSpanJson(child, includeContent, traceId, spanId, rootSpanId))
+    }
+    return tracePayload(project, spans)
+}
+
+private fun llmSpanJson(
+    span: LlmSpan,
+    includeContent: Boolean,
+    traceId: String,
+    spanId: String,
+    parentSpanId: String?,
 ): JSONObject {
     val attributes = JSONArray()
-        .put(strAttr("gen_ai.system", when (span.provider) {
-            FormatProvider.AZURE -> "azure.openai"
-            FormatProvider.OPENAI -> "openai"
-            FormatProvider.GEMINI -> "gcp.gemini"
-        }))
+        .put(strAttr("langsmith.span.kind", "llm"))
+        .put(strAttr("gen_ai.system", span.system))
         .put(strAttr("gen_ai.operation.name", "chat"))
         .put(strAttr("gen_ai.request.model", span.requestModel))
         .put(strAttr("gen_ai.request.reasoning_effort", span.reasoningEffort))
@@ -113,44 +162,74 @@ fun buildLlmSpanPayload(
         )
     }
 
-    return JSONObject().put(
-        "resourceSpans",
-        JSONArray().put(
-            JSONObject()
-                .put(
-                    "resource",
-                    JSONObject().put(
-                        "attributes",
-                        JSONArray()
-                            .put(strAttr("service.name", "freevoice"))
-                            .put(strAttr("langsmith.project", project)),
-                    ),
-                )
-                .put(
-                    "scopeSpans",
-                    JSONArray().put(
-                        JSONObject()
-                            .put("scope", JSONObject().put("name", "freevoice"))
-                            .put(
-                                "spans",
-                                JSONArray().put(
-                                    JSONObject()
-                                        .put("traceId", traceId)
-                                        .put("spanId", spanId)
-                                        .put("name", span.spanName)
-                                        .put("kind", 3) // SPAN_KIND_CLIENT
-                                        .put("startTimeUnixNano", unixNano(span.startTimeMs))
-                                        .put("endTimeUnixNano", unixNano(span.endTimeMs))
-                                        .put("attributes", attributes)
-                                        .put("status", status)
-                                        .put("events", events),
-                                ),
-                            ),
-                    ),
-                ),
-        ),
-    )
+    return spanJson(traceId, spanId, parentSpanId, span.spanName, SPAN_KIND_CLIENT, span.startTimeMs, span.endTimeMs)
+        .put("attributes", attributes)
+        .put("status", status)
+        .put("events", events)
 }
+
+private fun chainSpanJson(
+    span: ChainSpan,
+    includeContent: Boolean,
+    traceId: String,
+    spanId: String,
+): JSONObject {
+    val attributes = JSONArray().put(strAttr("langsmith.span.kind", "chain"))
+    if (includeContent) {
+        // トレース一覧とヘッダの Input/Output は root のものしか見ない。
+        // ここを落とすと、子が埋まっていても一覧が全部空に見える。
+        attributes.put(strAttr("input.value", span.input))
+        attributes.put(strAttr("output.value", span.output))
+    }
+    return spanJson(traceId, spanId, null, "recording", SPAN_KIND_INTERNAL, span.startTimeMs, span.endTimeMs)
+        .put("attributes", attributes)
+        .put("status", JSONObject().put("code", 1))
+        .put("events", JSONArray())
+}
+
+private fun spanJson(
+    traceId: String,
+    spanId: String,
+    parentSpanId: String?,
+    name: String,
+    kind: Int,
+    startTimeMs: Long,
+    endTimeMs: Long,
+): JSONObject = JSONObject()
+    .put("traceId", traceId)
+    .put("spanId", spanId)
+    .apply { parentSpanId?.let { put("parentSpanId", it) } }
+    .put("name", name)
+    .put("kind", kind)
+    .put("startTimeUnixNano", unixNano(startTimeMs))
+    .put("endTimeUnixNano", unixNano(endTimeMs))
+
+private fun tracePayload(project: String, spans: JSONArray): JSONObject = JSONObject().put(
+    "resourceSpans",
+    JSONArray().put(
+        JSONObject()
+            .put(
+                "resource",
+                JSONObject().put(
+                    "attributes",
+                    JSONArray()
+                        .put(strAttr("service.name", "freevoice"))
+                        .put(strAttr("langsmith.project", project)),
+                ),
+            )
+            .put(
+                "scopeSpans",
+                JSONArray().put(
+                    JSONObject()
+                        .put("scope", JSONObject().put("name", "freevoice"))
+                        .put("spans", spans),
+                ),
+            ),
+    ),
+)
+
+private const val SPAN_KIND_INTERNAL = 1
+private const val SPAN_KIND_CLIENT = 3
 
 private fun strAttr(key: String, value: String) =
     JSONObject().put("key", key).put("value", JSONObject().put("stringValue", value))
@@ -162,8 +241,8 @@ private fun intAttr(key: String, value: Int) =
 private fun unixNano(millis: Long): String = (millis * 1_000_000L).toString()
 
 /**
- * ペイロードは呼び出しスレッドで組み立て、POST だけ別スレッドへ流す。
- * 先に文字列にすることでプロンプトへの参照をすぐ手放せる。
+ * 組み立ても POST も別スレッドで行う。録音ぶんの送信は入力確定直後、
+ * つまりメインスレッドから来るので、JSON 化までメインに載せない。
  * 送信失敗は握り潰し、音声入力本体には一切影響させない。
  * 音声入力ジョブより長生きするので、所有者はアプリ側の 1 インスタンスに限る。
  */
@@ -175,15 +254,17 @@ class LangsmithTracer(
 ) : AutoCloseable {
     private val random = SecureRandom()
 
-    /** 呼び出し側が config.active を保証する。判定は sinkFor に寄せてある。 */
-    fun send(config: LangsmithConfig, span: LlmSpan) {
-        val payload = runCatching {
-            buildLlmSpanPayload(span, config.project, config.includeContent, randomHex(random, TRACE_ID_BYTES), randomHex(random, SPAN_ID_BYTES)).toString()
-        }.getOrElse {
-            onFailure("トレースを組み立てられなかった: ${it.javaClass.simpleName}")
-            return
-        }
-        runCatching { executor.execute { post(config, payload) } }
+    /** 呼び出し側が config.active を保証する。判定は configFor に寄せてある。 */
+    fun send(config: LangsmithConfig, span: LlmSpan) = submit(config) {
+        buildLlmSpanPayload(span, config.project, config.includeContent, traceId(), spanId())
+    }
+
+    /** 録音 1 回ぶんを 1 リクエストで送る。root ごと送るので孤児スパンが出ない。 */
+    fun send(config: LangsmithConfig, root: ChainSpan, children: List<LlmSpan>) = submit(config) {
+        buildRecordingPayload(
+            root, children, config.project, config.includeContent,
+            traceId(), spanId(), children.map { spanId() },
+        )
     }
 
     internal fun report(message: String) = onFailure(message)
@@ -191,6 +272,22 @@ class LangsmithTracer(
     override fun close() {
         executor.shutdownNow()
     }
+
+    private fun submit(config: LangsmithConfig, build: () -> JSONObject) {
+        runCatching {
+            executor.execute {
+                val payload = runCatching { build().toString() }.getOrElse {
+                    onFailure("トレースを組み立てられなかった: ${it.javaClass.simpleName}")
+                    return@execute
+                }
+                post(config, payload)
+            }
+        }
+    }
+
+    private fun traceId(): String = randomHex(random, TRACE_ID_BYTES)
+
+    private fun spanId(): String = randomHex(random, SPAN_ID_BYTES)
 
     private fun post(config: LangsmithConfig, payload: String) {
         var connection: HttpURLConnection? = null
@@ -234,10 +331,10 @@ internal fun randomHex(random: Random, bytes: Int): String =
 
 /**
  * 送るかどうかの判定はここだけが持つ。設定が揃っていなければ null を返し、
- * VoiceApiClient 側でスパン組み立てごと省く。
+ * 呼び出し側でスパン組み立てごと省く。
  * 「有効にしたのに送られない」ときは黙って捨てず、足りない設定を報告する。
  */
-fun LangsmithTracer?.sinkFor(settings: AppSettings): ((LlmSpan) -> Unit)? {
+fun LangsmithTracer?.configFor(settings: AppSettings): LangsmithConfig? {
     val tracer = this ?: return null
     val config = settings.toLangsmithConfig()
     if (!config.enabled) return null
@@ -245,5 +342,12 @@ fun LangsmithTracer?.sinkFor(settings: AppSettings): ((LlmSpan) -> Unit)? {
         tracer.report("トレースを送れない: $it が未入力")
         return null
     }
+    return config
+}
+
+/** 単発のトレースを送る口。録音ぶんは RecordingTrace が溜めてから送る。 */
+fun LangsmithTracer?.sinkFor(settings: AppSettings): ((LlmSpan) -> Unit)? {
+    val tracer = this ?: return null
+    val config = configFor(settings) ?: return null
     return { span -> tracer.send(config, span) }
 }
