@@ -40,6 +40,7 @@ class FreeVoiceInputMethodService : InputMethodService() {
     private lateinit var history: HistoryRepository
     private lateinit var diagnostics: DiagLogger
     private lateinit var contextUpdater: TopicContextUpdater
+    private lateinit var gateway: SettingsVoiceGateway
     private lateinit var tracer: LangsmithTracer
     private lateinit var editor: ImeEditor
     private var keyboardUi: ImeKeyboardUi? = null
@@ -58,7 +59,7 @@ class FreeVoiceInputMethodService : InputMethodService() {
             editorInfo = { currentInputEditorInfo },
         )
         // 録音時間の上限も認識の中断も、キーを離したのと同じ1本の停止シグナルにする。
-        val gateway = SettingsVoiceGateway(
+        gateway = SettingsVoiceGateway(
             settings = settings,
             topicContext = topicContext,
             cacheDir = cacheDir,
@@ -142,10 +143,13 @@ class FreeVoiceInputMethodService : InputMethodService() {
                 val committed = active?.connection?.commitText(text, 1) == true
                 clearTarget(jobId)
                 if (!committed) {
+                    gateway.cancel()
                     history.add("", false, "入力先へ文字を挿入できなかった")
                     diagnostics.error("ime", "InputConnection.commitText failed")
                     return@post
                 }
+                // 実際に入力できたテキストが、この録音のトレースの output になる。
+                gateway.finish(text)
                 history.add(text, true)
                 diagnostics.info("ime", "Voice input committed (${text.length} chars)")
                 if (!formatFallback) contextUpdater.update(packageName, text)
@@ -154,6 +158,7 @@ class FreeVoiceInputMethodService : InputMethodService() {
 
         override fun failed(jobId: Long, message: String, error: Throwable?) {
             main.post {
+                gateway.cancel()
                 clearTarget(jobId)
                 history.add("", false, message)
                 diagnostics.error("voice", message, error)

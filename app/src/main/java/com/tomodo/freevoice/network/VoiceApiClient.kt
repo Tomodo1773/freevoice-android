@@ -132,7 +132,7 @@ class VoiceApiClient(private val config: VoiceApiConfig, private val onTrace: ((
         sink(
             LlmSpan(
                 spanName = spanName,
-                provider = config.format.provider,
+                system = config.format.provider.genAiSystem,
                 requestModel = config.format.model,
                 responseModel = completion?.model,
                 messages = messages,
