@@ -112,7 +112,7 @@ dependencies {
     implementation("com.microsoft.cognitiveservices.speech:client-sdk:1.53.0")
     // Gemini Live API 用。Android SDK に WebSocket クライアントがない。
     // OkHttp 5.5.0 は compileSdk 37 以上を要求する。
-    implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.1")
 
     testImplementation("junit:junit:4.13.2")
     // android.jar の org.json はスタブなので、JVM テストでは実装を差す。
